@@ -4,39 +4,41 @@ const propertyController = require("../controllers/property.controller");
 const auth = require("../middlewares/auth.middleware");
 
 router.post(
-  "/properties",
+  "/createProperty",
   auth(["isEmp", "isAdmin"]),
   propertyController.createProperty
 );
 
 router.get(
-  "/properties",
+  "/getAllProperties",
   auth(["isEmp", "isAdmin"]),
   propertyController.getAllProperties
 );
 
 router.get(
-  "/properties/:id",
+  "/getPropertyById/:id",
   auth(["isEmp", "isAdmin"]),
   propertyController.getPropertyById
 );
 
 router.put(
-  "/properties/:id",
+  "/updateProperty/:id",
   auth(["isEmp", "isAdmin"]),
   propertyController.updateProperty
 );
 
 router.delete(
-  "/properties/:id",
+  "/deleteProperty/:id",
   auth(["isEmp", "isAdmin"]),
   propertyController.deleteProperty
 );
 
 router.post(
-  "/properties/reviews/:propertyId",
+  "/addReview/:propertyId",
   auth(["isEmp", "isAdmin"]),
   propertyController.addReview
 );
 
 module.exports = router;
+
+

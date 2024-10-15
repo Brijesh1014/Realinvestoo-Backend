@@ -19,10 +19,10 @@ router.get(
   authController.googleLogin
 );
 
-router.post("/forget-password", authController.forgetPassword);
-router.post("/verify-otp", authController.verifyOtp);
-router.put("/reset-password", authController.resetPassword);
-router.post("/resend-otp", authController.resendOtp);
-router.post("/change-password", authController.changePassword);
+router.post("/forgetPassword", authController.forgetPassword);
+router.post("/verifyOtp", authController.verifyOtp);
+router.put("/resetPassword", authController.resetPassword);
+router.post("/resendOtp", authController.resendOtp);
+router.post("/changePassword", authController.changePassword);
 
 module.exports = router;

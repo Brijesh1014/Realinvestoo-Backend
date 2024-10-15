@@ -10,6 +10,7 @@ const authRoute = require("./src/routes/auth.route");
 const adminRoute = require("./src/routes/admin.route");
 const userRoute = require("./src/routes/user.route");
 const propertyRoute = require("./src/routes/property.route");
+const newsRoute = require("./src/routes/news.route");
 
 app.set("view engine", "ejs");
 const viewsDir = path.join(__dirname, "../src/views");
@@ -33,6 +34,7 @@ app.use("/auth", authRoute);
 app.use("/admin", adminRoute);
 app.use("/user", userRoute);
 app.use("/property", propertyRoute);
+app.use("/news", newsRoute);
 app.listen(PORT, () => {
   console.log(`Server up and running on port ${PORT}!`);
 });

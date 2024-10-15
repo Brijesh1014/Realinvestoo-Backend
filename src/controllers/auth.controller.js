@@ -1,9 +1,6 @@
 const User_Model = require("../models/user.model");
 const bcrypt = require("bcrypt");
-const nodemailer = require("nodemailer");
-const jwt = require("jsonwebtoken");
 const generateTokens = require("../utils/generate.token");
-const passport = require("passport");
 const dotenv = require("dotenv");
 const sendEmail = require("../services/email.service");
 dotenv.config();
