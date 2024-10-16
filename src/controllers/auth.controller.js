@@ -14,7 +14,6 @@ const register = async (req, res) => {
       phoneNo,
       username,
       password,
-      conformPassword,
       country,
       state,
       city,
@@ -39,9 +38,6 @@ const register = async (req, res) => {
         .json({ message: "Please enter all required fields" });
     }
 
-    if (password !== conformPassword) {
-      return res.status(400).json({ message: "Passwords do not match" });
-    }
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -51,7 +47,6 @@ const register = async (req, res) => {
       phoneNo,
       username,
       password: hashedPassword,
-      conformPassword: hashedPassword,
       country,
       state,
       city,
@@ -199,7 +194,7 @@ const verifyOtp = async (req, res) => {
 };
 const resetPassword = async (req, res) => {
   try {
-    const { email, newPassword, confirmPassword } = req.body;
+    const { email, newPassword } = req.body;
 
     const user = await User_Model.findOne({ email });
     if (!user) {
@@ -210,12 +205,6 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({
         message:
           "OTP not verified. Please verify the OTP before resetting password",
-      });
-    }
-
-    if (newPassword !== confirmPassword) {
-      return res.status(400).json({
-        message: "New password and confirm password do not match",
       });
     }
 
@@ -266,13 +255,7 @@ const resendOtp = async (req, res) => {
 };
 const changePassword = async (req, res) => {
   try {
-    const { email, currentPassword, newPassword, confirmPassword } = req.body;
-
-    if (newPassword !== confirmPassword) {
-      return res
-        .status(400)
-        .json({ message: "New password and confirm password do not match" });
-    }
+    const { email, currentPassword, newPassword } = req.body;
 
     const user = await User_Model.findOne({ email });
     if (!user) {
