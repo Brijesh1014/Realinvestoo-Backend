@@ -21,6 +21,9 @@ const User = new Schema(
     conformPassword: {
       type: String,
     },
+    gender: {
+      type: String,
+    },
     profileImage: {
       type: String,
     },

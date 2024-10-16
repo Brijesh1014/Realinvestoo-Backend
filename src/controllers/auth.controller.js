@@ -1,4 +1,5 @@
 const User_Model = require("../models/user.model");
+const Token_Model = require("../models/token.model");
 const bcrypt = require("bcrypt");
 const generateTokens = require("../utils/generate.token");
 const dotenv = require("dotenv");
@@ -32,7 +33,7 @@ const register = async (req, res) => {
         .json({ message: "User already exists with that email" });
     }
 
-    if (!name || !email || !password || !conformPassword) {
+    if (!name || !email || !password) {
       return res
         .status(400)
         .json({ message: "Please enter all required fields" });
@@ -140,7 +141,7 @@ const googleLogin = async (req, res) => {
 };
 
 const generateOTP = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return Math.floor(1000 + Math.random() * 9000).toString();
 };
 
 const forgetPassword = async (req, res) => {
@@ -298,6 +299,89 @@ const changePassword = async (req, res) => {
   }
 };
 
+const editProfile = async (req, res) => {
+  try {
+    const {
+      name,
+      phoneNo,
+      gender,
+      profileImage,
+      country,
+      state,
+      city,
+      zipCode,
+      reasonForJoining,
+    } = req.body;
+    let updateData = {
+      name,
+      phoneNo,
+      gender,
+      profileImage,
+      country,
+      state,
+      city,
+      zipCode,
+      reasonForJoining,
+    };
+    const profile = await User_Model.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      {
+        new: true,
+        upsert: true,
+        runValidators: true,
+      }
+    );
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: "Profile not found",
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      data: profile,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update property",
+      error: error.message,
+    });
+  }
+};
+const logout = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const user = await User_Model.findOne({ _id: userId });
+    if (!user) {
+      return res
+        .status(400)
+        .json({ status: -1, message: "You have to register", success: false });
+    }
+
+    const userToken = await Token_Model.findOneAndUpdate(
+      { userId: user._id },
+      { accessToken: "", refreshToken: "" }
+    );
+    if (!userToken) {
+      return res.status(400).json({
+        message: "Something went wrong",
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Logout successfully",
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
 module.exports = {
   register,
   login,
@@ -307,4 +391,6 @@ module.exports = {
   resetPassword,
   resendOtp,
   changePassword,
+  editProfile,
+  logout,
 };
