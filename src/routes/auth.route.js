@@ -8,16 +8,19 @@ const router = express.Router();
 router.post("/register", authController.register);
 router.post("/login", authController.login);
 
-router.get(
-  "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-);
+// router.get(
+//   "/google",
+//   passport.authenticate("google", { scope: ["profile", "email"] })
+// );
 
-router.get(
-  "/google/callback",
-  passport.authenticate("google", { session: false }),
-  authController.googleLogin
-);
+// router.get(
+//   "/google/callback",
+//   passport.authenticate("google", { session: false }),
+//   (req, res) => {
+//     const accessToken = req.user.tokens; // Access the tokens generated in the strategy
+//     res.json({ data: req.user, accessToken });
+//   }
+// );
 
 router.post("/forgetPassword", authController.forgetPassword);
 router.post("/verifyOtp", authController.verifyOtp);
@@ -34,5 +37,7 @@ router.post(
   auth(["isEmp", "isAdmin", "isProuser", "isAgent"]),
   authController.logout
 );
+router.post("/google", authController.googleAuth);
+router.post("/googleLogin", authController.googleLogin);
 
 module.exports = router;

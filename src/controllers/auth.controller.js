@@ -1,5 +1,6 @@
 const User_Model = require("../models/user.model");
 const Token_Model = require("../models/token.model");
+const { OAuth2Client } = require("google-auth-library");
 const bcrypt = require("bcrypt");
 const generateTokens = require("../utils/generate.token");
 const dotenv = require("dotenv");
@@ -104,34 +105,86 @@ const login = async (req, res) => {
 };
 
 const googleLogin = async (req, res) => {
+  const { token } = req.body;
+  const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
   try {
-    const { user } = req;
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const { sub, email } = ticket.getPayload();
 
-    let existingUser = await User_Model.findOne({ email: user.email });
-
-    if (!existingUser) {
-      return res.status(400).json({
-        message: "User does not exist. Please register first.",
-        success: false,
-      });
+    const user = await User_Model.findOne({ email, googleId: sub });
+    if (!user) {
+      return res
+        .status(400)
+        .json({ success: false, message: "User not found or not created." });
     }
-
-    // Here, you can generate tokens for the existing user
     const { accessToken, refreshToken, accessTokenExpiry, refreshTokenExpiry } =
-      await generateTokens.generateTokens(existingUser.email, existingUser._id);
-
-    res.status(200).json({
+      await generateTokens.generateTokens(email, user._id);
+    return res.status(200).json({
       success: true,
       message: "Login successful",
-      data: existingUser,
+      data: user,
       accessToken,
       refreshToken,
       accessTokenExpiry,
       refreshTokenExpiry,
     });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Server error", success: false });
+    res
+      .status(500)
+      .json({ success: false, message: "INVALID_TOKEN", error: error.message });
+  }
+};
+const googleAuth = async (req, res) => {
+  const { token } = req.body;
+  const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const { sub, given_name, family_name, email, picture } =
+      ticket.getPayload();
+
+    const user = await User_Model.findOneAndUpdate(
+      { email, googleId: sub },
+      {
+        googleToken: token,
+        profileImage: picture,
+        name: `${given_name} ${family_name}`,
+      },
+      { upsert: true, new: true }
+    );
+
+    if (user) {
+      const {
+        accessToken,
+        refreshToken,
+        accessTokenExpiry,
+        refreshTokenExpiry,
+      } = await generateTokens.generateTokens(email, user._id);
+      return res.status(200).json({
+        success: true,
+        message: "Login successful",
+        data: user,
+        accessToken,
+        refreshToken,
+        accessTokenExpiry,
+        refreshTokenExpiry,
+      });
+    } else {
+      return res
+        .status(400)
+        .json({ success: false, message: "User not found or created." });
+    }
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, message: "INVALID_TOKEN", error: error.message });
   }
 };
 
@@ -376,4 +429,5 @@ module.exports = {
   changePassword,
   editProfile,
   logout,
+  googleAuth,
 };
