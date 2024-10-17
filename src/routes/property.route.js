@@ -39,6 +39,16 @@ router.post(
   propertyController.addReview
 );
 
+router.post(
+  "/createAppointment",
+  auth(["isEmp", "isAdmin"]),
+  propertyController.createAppointment
+);
+
+router.get(
+  "/getAllAppointments",
+  auth(["isEmp", "isAdmin"]),
+  propertyController.getAllAppointments
+);
+
 module.exports = router;
-
-

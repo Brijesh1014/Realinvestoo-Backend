@@ -18,9 +18,6 @@ const User = new Schema(
     password: {
       type: String,
     },
-    conformPassword: {
-      type: String,
-    },
     gender: {
       type: String,
     },
@@ -60,6 +57,10 @@ const User = new Schema(
       type: Boolean,
       default: false,
     },
+    googleToken: {
+      type: String,
+    },
+    googleId: { type: String },
   },
   { timestamps: true }
 );

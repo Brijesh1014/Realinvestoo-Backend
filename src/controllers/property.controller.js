@@ -1,5 +1,6 @@
 const Property = require("../models/property.model");
-
+const Appointment = require("../models/appointment.model");
+const User = require("../models/user.model");
 // Create Property
 const createProperty = async (req, res) => {
   try {
@@ -40,10 +41,13 @@ const getAllProperties = async (req, res) => {
       bestOffer,
       upcoming,
       recommended,
+      page = 1, // Default to page 1 if not provided
+      limit = 10, // Default to 10 results per page if not provided
     } = req.query;
 
     const query = {};
 
+    // Filters based on the query parameters
     if (location) query.address = { $regex: location, $options: "i" };
 
     if (type) query.propertyType = type;
@@ -74,28 +78,43 @@ const getAllProperties = async (req, res) => {
       ];
     }
 
-    if (topRated) {
-      query.ratings = { $gte: 4 };
-    }
+    if (topRated) query.ratings = { $gte: 4 };
 
-    if (bestOffer) {
-      query.bestOffer = true;
-    }
+    if (bestOffer) query.bestOffer = true;
 
-    if (upcoming) {
-      query.new = true;
-    }
+    if (upcoming) query.new = true;
 
-    if (recommended) {
-      query.recommended = true;
-    }
+    if (recommended) query.recommended = true;
 
-    const properties = await Property.find(query);
+    // Convert `page` and `limit` to integers
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+
+    // Calculate how many documents to skip for pagination
+    const skip = (pageNumber - 1) * pageSize;
+
+    // Get the total count of documents matching the query
+    const totalProperties = await Property.countDocuments(query);
+
+    // Fetch properties with pagination
+    const properties = await Property.find(query).skip(skip).limit(pageSize);
+
+    // Calculate total pages and remaining pages
+    const totalPages = Math.ceil(totalProperties / pageSize);
+    const remainingPages =
+      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
 
     return res.status(200).json({
       success: true,
       message: "Get all properties successful",
       data: properties,
+      meta: {
+        totalProperties,
+        currentPage: pageNumber,
+        totalPages,
+        remainingPages,
+        pageSize: properties.length, // Actual number of results returned (might be less than limit on the last page)
+      },
     });
   } catch (error) {
     console.error(error);
@@ -137,6 +156,7 @@ const updateProperty = async (req, res) => {
   try {
     const property = await Property.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
+      upsert: true,
       runValidators: true,
     });
     if (!property) {
@@ -243,6 +263,150 @@ const addReview = async (req, res) => {
   }
 };
 
+const createAppointment = async (req, res) => {
+  try {
+    const { property, user, date, time, agent, comment } = req.body;
+
+    let propertyIsExits = await Property.findById(property);
+    if (!propertyIsExits) {
+      return res.status(400).json({
+        success: false,
+        message: "Property not found",
+      });
+    }
+
+    let userIsExits = await User.findOne({ _id: user, isEmp: true });
+    if (!userIsExits) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    let agentIsExits = await User.findOne({ _id: agent, isAgent: true });
+    if (!agentIsExits) {
+      return res.status(400).json({
+        success: false,
+        message: "Agent not found",
+      });
+    }
+
+    const newAppointment = new Appointment({
+      property,
+      user,
+      date,
+      agent,
+      time,
+      comment,
+      createdBy: req.userId,
+    });
+
+    await newAppointment.save();
+    res.status(201).json({
+      success: true,
+      message: "Scheduled appointment successful",
+      data: newAppointment,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Server Error", error: err });
+  }
+};
+const getAllAppointments = async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
+
+    const totalCategoriesCount = await Appointment.countDocuments();
+
+    const appointments = await Appointment.find()
+      .populate("property", "propertyName propertyType")
+      .populate("user", "name email phoneNo")
+      .populate("agent", "name email phoneNo")
+      .populate("createdBy", "name email phoneNo")
+      .skip(skip)
+      .limit(pageSize);
+
+    const totalPages = Math.ceil(totalCategoriesCount / pageSize);
+    const remainingPages =
+      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
+
+    return res.status(200).json({
+      success: true,
+      message: "Fetched all appointments successfully",
+      data: appointments,
+      meta: {
+        totalCategoriesCount,
+        currentPage: pageNumber,
+        totalPages,
+        remainingPages,
+        pageSize: appointments.length,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching appointments:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching appointments",
+      error: error.message,
+    });
+  }
+};
+const getAppointmentById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const appointment = await Appointment.findById(id)
+      .populate("property", "propertyName propertyType")
+      .populate("user", "name email phoneNo")
+      .populate("agent", "name email phoneNo")
+      .populate("createdBy", "name email phoneNo");
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: "Appointment not found",
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Appointment retrieved successfully",
+      data: appointment,
+    });
+  } catch (error) {
+    console.error("Error fetching appointment:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching appointment",
+      error: error.message,
+    });
+  }
+};
+const getUserAppointments = async (req, res) => {
+  try {
+    const appointment = await Appointment.find(
+      { user: req.userId } || { agent: req.userId } || { createdBy: req.userId }
+    );
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: "Something went wrong",
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Appointment retrieved successfully",
+      data: appointment,
+    });
+  } catch (error) {
+    console.error("Error fetching appointment:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching appointment",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createProperty,
   getAllProperties,
@@ -250,4 +414,7 @@ module.exports = {
   updateProperty,
   deleteProperty,
   addReview,
+  createAppointment,
+  getAllAppointments,
+  getUserAppointments,
 };

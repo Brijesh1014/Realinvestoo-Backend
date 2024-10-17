@@ -11,6 +11,10 @@ const adminRoute = require("./src/routes/admin.route");
 const userRoute = require("./src/routes/user.route");
 const propertyRoute = require("./src/routes/property.route");
 const newsRoute = require("./src/routes/news.route");
+const chatRoute = require("./src/routes/chat.route");
+const messageRoute = require("./src/routes/message.route");
+const couponRoute = require("./src/routes/coupon.route");
+const initSocketIo = require("./src/services/socket.service");
 
 app.set("view engine", "ejs");
 const viewsDir = path.join(__dirname, "../src/views");
@@ -35,6 +39,19 @@ app.use("/admin", adminRoute);
 app.use("/user", userRoute);
 app.use("/property", propertyRoute);
 app.use("/news", newsRoute);
-app.listen(PORT, () => {
+app.use("/chat", chatRoute);
+app.use("/message", messageRoute);
+app.use("/coupon", couponRoute);
+const server = app.listen(PORT, () => {
   console.log(`Server up and running on port ${PORT}!`);
 });
+
+const io = require("socket.io")(server, {
+  pingTimeout: 60000,
+  cors: {
+    origin: "*",
+    credentials: true,
+  },
+});
+
+initSocketIo(io);

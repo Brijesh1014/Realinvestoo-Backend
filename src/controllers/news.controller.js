@@ -29,15 +29,40 @@ const createCategory = async (req, res) => {
 
 const getAllCategories = async (req, res) => {
   try {
-    const categories = await NewsCategory.find().populate(
-      "createdBy",
-      "username"
-    ); // Populate with creator's username
+    const { page = 1, limit = 10 } = req.query; // Default page 1 and limit 10
+
+    // Convert `page` and `limit` to integers
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+
+    // Calculate how many documents to skip for pagination
+    const skip = (pageNumber - 1) * pageSize;
+
+    // Get the total count of categories
+    const totalCategoriesCount = await NewsCategory.countDocuments();
+
+    // Fetch the categories with pagination
+    const categories = await NewsCategory.find()
+      .populate("createdBy", "username") // Populate with creator's username
+      .skip(skip)
+      .limit(pageSize);
+
+    // Calculate total pages and remaining pages
+    const totalPages = Math.ceil(totalCategoriesCount / pageSize);
+    const remainingPages =
+      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
 
     return res.status(200).json({
       success: true,
       message: "Fetched all categories successfully",
       data: categories,
+      meta: {
+        totalCategoriesCount,
+        currentPage: pageNumber,
+        totalPages,
+        remainingPages,
+        pageSize: categories.length, // Actual number of results returned
+      },
     });
   } catch (error) {
     console.error("Error fetching categories:", error);
@@ -48,6 +73,7 @@ const getAllCategories = async (req, res) => {
     });
   }
 };
+
 const getCategoryById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -182,14 +208,41 @@ const createNews = async (req, res) => {
 
 const getAllNews = async (req, res) => {
   try {
+    const { page = 1, limit = 10 } = req.query; // Default page 1 and limit 10
+
+    // Convert `page` and `limit` to integers
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+
+    // Calculate how many documents to skip for pagination
+    const skip = (pageNumber - 1) * pageSize;
+
+    // Get the total count of documents
+    const totalNewsCount = await News.countDocuments();
+
+    // Fetch the news with pagination
     const news = await News.find()
       .populate("category", "name")
-      .populate("createdBy", "username");
+      .populate("createdBy", "username")
+      .skip(skip)
+      .limit(pageSize);
+
+    // Calculate total pages and remaining pages
+    const totalPages = Math.ceil(totalNewsCount / pageSize);
+    const remainingPages =
+      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
 
     return res.status(200).json({
       success: true,
       message: "Fetched all news successfully",
       data: news,
+      meta: {
+        totalNewsCount,
+        currentPage: pageNumber,
+        totalPages,
+        remainingPages,
+        pageSize: news.length, // Actual number of results returned
+      },
     });
   } catch (error) {
     console.error("Error fetching news:", error);
