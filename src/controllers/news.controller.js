@@ -29,25 +29,20 @@ const createCategory = async (req, res) => {
 
 const getAllCategories = async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query; // Default page 1 and limit 10
+    const { page = 1, limit = 10 } = req.query;
 
-    // Convert `page` and `limit` to integers
     const pageNumber = parseInt(page);
     const pageSize = parseInt(limit);
 
-    // Calculate how many documents to skip for pagination
     const skip = (pageNumber - 1) * pageSize;
 
-    // Get the total count of categories
     const totalCategoriesCount = await NewsCategory.countDocuments();
 
-    // Fetch the categories with pagination
     const categories = await NewsCategory.find()
-      .populate("createdBy", "username") // Populate with creator's username
+      .populate("createdBy", "username")
       .skip(skip)
       .limit(pageSize);
 
-    // Calculate total pages and remaining pages
     const totalPages = Math.ceil(totalCategoriesCount / pageSize);
     const remainingPages =
       totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
@@ -61,7 +56,7 @@ const getAllCategories = async (req, res) => {
         currentPage: pageNumber,
         totalPages,
         remainingPages,
-        pageSize: categories.length, // Actual number of results returned
+        pageSize: categories.length,
       },
     });
   } catch (error) {
@@ -208,26 +203,20 @@ const createNews = async (req, res) => {
 
 const getAllNews = async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query; // Default page 1 and limit 10
-
-    // Convert `page` and `limit` to integers
+    const { page = 1, limit = 10 } = req.query;
     const pageNumber = parseInt(page);
     const pageSize = parseInt(limit);
 
-    // Calculate how many documents to skip for pagination
     const skip = (pageNumber - 1) * pageSize;
 
-    // Get the total count of documents
     const totalNewsCount = await News.countDocuments();
 
-    // Fetch the news with pagination
     const news = await News.find()
       .populate("category", "name")
       .populate("createdBy", "username")
       .skip(skip)
       .limit(pageSize);
 
-    // Calculate total pages and remaining pages
     const totalPages = Math.ceil(totalNewsCount / pageSize);
     const remainingPages =
       totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
@@ -241,7 +230,7 @@ const getAllNews = async (req, res) => {
         currentPage: pageNumber,
         totalPages,
         remainingPages,
-        pageSize: news.length, // Actual number of results returned
+        pageSize: news.length,
       },
     });
   } catch (error) {
@@ -290,7 +279,6 @@ const updateNews = async (req, res) => {
     const { title, category, description, image, creatorName, dateOfPost } =
       req.body;
 
-    // Check if the category exists
     const existingCategory = await NewsCategory.findById(category);
     if (!existingCategory) {
       return res.status(404).json({
@@ -303,7 +291,7 @@ const updateNews = async (req, res) => {
       id,
       {
         title,
-        category, // Reference ID
+        category,
         description,
         image,
         creatorName,

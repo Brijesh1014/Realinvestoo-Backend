@@ -68,18 +68,14 @@ const fetchChats = async (req, res) => {
 
 const createGroupChat = async (req, res) => {
   try {
-    // Check for the required fields in the request body
     if (!req.body.users || !req.body.name) {
       return res.status(400).send({ message: "Please fill all fields" });
     }
 
-    // Check if users is an array
     if (!Array.isArray(req.body.users)) {
       return res.status(400).send({ message: "Users must be an array" });
     }
-    console.log("fsdelvndskndkn");
 
-    // Check if user IDs exist in the database
     const validUsers = await User.find({ _id: { $in: req.body.users } });
     if (validUsers.length !== req.body.users.length) {
       return res

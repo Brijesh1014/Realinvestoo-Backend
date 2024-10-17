@@ -1,7 +1,7 @@
 const Property = require("../models/property.model");
 const Appointment = require("../models/appointment.model");
 const User = require("../models/user.model");
-// Create Property
+
 const createProperty = async (req, res) => {
   try {
     const property = new Property(req.body);
@@ -21,7 +21,6 @@ const createProperty = async (req, res) => {
   }
 };
 
-// Get All Properties
 const getAllProperties = async (req, res) => {
   try {
     const {
@@ -41,13 +40,12 @@ const getAllProperties = async (req, res) => {
       bestOffer,
       upcoming,
       recommended,
-      page = 1, // Default to page 1 if not provided
-      limit = 10, // Default to 10 results per page if not provided
+      page = 1, 
+      limit = 10, 
     } = req.query;
 
     const query = {};
 
-    // Filters based on the query parameters
     if (location) query.address = { $regex: location, $options: "i" };
 
     if (type) query.propertyType = type;
@@ -86,20 +84,15 @@ const getAllProperties = async (req, res) => {
 
     if (recommended) query.recommended = true;
 
-    // Convert `page` and `limit` to integers
     const pageNumber = parseInt(page);
     const pageSize = parseInt(limit);
 
-    // Calculate how many documents to skip for pagination
     const skip = (pageNumber - 1) * pageSize;
 
-    // Get the total count of documents matching the query
     const totalProperties = await Property.countDocuments(query);
 
-    // Fetch properties with pagination
     const properties = await Property.find(query).skip(skip).limit(pageSize);
 
-    // Calculate total pages and remaining pages
     const totalPages = Math.ceil(totalProperties / pageSize);
     const remainingPages =
       totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
@@ -113,7 +106,7 @@ const getAllProperties = async (req, res) => {
         currentPage: pageNumber,
         totalPages,
         remainingPages,
-        pageSize: properties.length, // Actual number of results returned (might be less than limit on the last page)
+        pageSize: properties.length, 
       },
     });
   } catch (error) {
@@ -126,7 +119,6 @@ const getAllProperties = async (req, res) => {
   }
 };
 
-// Get Property By ID
 const getPropertyById = async (req, res) => {
   try {
     const property = await Property.findById(req.params.id);
@@ -151,7 +143,6 @@ const getPropertyById = async (req, res) => {
   }
 };
 
-// Update Property
 const updateProperty = async (req, res) => {
   try {
     const property = await Property.findByIdAndUpdate(req.params.id, req.body, {
@@ -180,7 +171,6 @@ const updateProperty = async (req, res) => {
   }
 };
 
-// Delete Property
 const deleteProperty = async (req, res) => {
   try {
     const property = await Property.findByIdAndDelete(req.params.id);
@@ -219,17 +209,14 @@ const addReview = async (req, res) => {
       });
     }
 
-    // Check if the user already reviewed this property
     const existingReview = property.reviews.find(
       (r) => r.user.toString() === userId.toString()
     );
 
     if (existingReview) {
-      // Update the existing review
       existingReview.rating = rating;
       existingReview.review = review;
     } else {
-      // Add new review
       const newReview = {
         user: userId,
         rating,
@@ -238,14 +225,12 @@ const addReview = async (req, res) => {
       property.reviews.push(newReview);
     }
 
-    // Calculate the new average rating
     const totalRating = property.reviews.reduce(
       (acc, item) => acc + item.rating,
       0
     );
     property.ratings = totalRating / property.reviews.length;
 
-    // Save the updated property
     await property.save();
 
     return res.status(200).json({
