@@ -1,0 +1,379 @@
+const User_Model = require("../models/user.model");
+const Token_Model = require("../models/token.model");
+const bcrypt = require("bcrypt");
+const generateTokens = require("../utils/generate.token");
+const dotenv = require("dotenv");
+const sendEmail = require("../services/email.service");
+dotenv.config();
+
+const register = async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      phoneNo,
+      username,
+      password,
+      country,
+      state,
+      city,
+      zipCode,
+      reasonForJoining,
+      isAdmin,
+      isAgent,
+      isProuser,
+      isEmp,
+    } = req.body;
+
+    const existingUser = await User_Model.findOne({ email });
+    if (existingUser) {
+      return res
+        .status(400)
+        .json({ message: "User already exists with that email" });
+    }
+
+    if (!name || !email || !password) {
+      return res
+        .status(400)
+        .json({ message: "Please enter all required fields" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const newUser = new User_Model({
+      name,
+      email,
+      phoneNo,
+      username,
+      password: hashedPassword,
+      country,
+      state,
+      city,
+      zipCode,
+      reasonForJoining,
+      isAdmin,
+      isAgent,
+      isProuser,
+      isEmp,
+    });
+
+    await newUser.save();
+    res.status(201).json({
+      success: true,
+      data: newUser,
+      message: "User registered successfully",
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User_Model.findOne({ email: email });
+
+    if (!user) {
+      return res
+        .status(400)
+        .json({ status: -1, message: "You have to register", success: false });
+    }
+    const match = await bcrypt.compare(password, user.password);
+
+    if (!match) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Password Does Not Match" });
+    }
+    const { accessToken, refreshToken, accessTokenExpiry, refreshTokenExpiry } =
+      await generateTokens.generateTokens(email, user._id);
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      data: user,
+      accessToken,
+      accessTokenExpiry,
+      refreshToken,
+      refreshTokenExpiry,
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+const googleLogin = async (req, res) => {
+  try {
+    const { user } = req;
+
+    let existingUser = await User_Model.findOne({ email: user.email });
+
+    if (!existingUser) {
+      return res.status(400).json({
+        message: "User does not exist. Please register first.",
+        success: false,
+      });
+    }
+
+    // Here, you can generate tokens for the existing user
+    const { accessToken, refreshToken, accessTokenExpiry, refreshTokenExpiry } =
+      await generateTokens.generateTokens(existingUser.email, existingUser._id);
+
+    res.status(200).json({
+      success: true,
+      message: "Login successful",
+      data: existingUser,
+      accessToken,
+      refreshToken,
+      accessTokenExpiry,
+      refreshTokenExpiry,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server error", success: false });
+  }
+};
+
+const generateOTP = () => {
+  return Math.floor(1000 + Math.random() * 9000).toString();
+};
+
+const forgetPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User_Model.findOne({ email });
+
+    if (!user) {
+      return res
+        .status(400)
+        .json({ message: "User with this email does not exist" });
+    }
+
+    const otp = generateOTP();
+
+    user.resetOtp = otp;
+    user.otpExpiry = Date.now() + 10 * 60 * 1000;
+    await user.save();
+
+    const emailText = `Your OTP for password reset is ${otp}. This OTP is valid for 10 minutes.`;
+
+    await sendEmail(email, "Password Reset OTP", emailText);
+
+    return res
+      .status(200)
+      .json({ success: true, message: "OTP sent to email successfully" });
+  } catch (error) {
+    console.error("Error in forgetPassword:", error);
+    return res.status(500).json({ message: "Server error", error });
+  }
+};
+const verifyOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    const user = await User_Model.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    if (user.resetOtp !== otp || Date.now() > user.otpExpiry) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    user.otpVerified = true;
+    await user.save();
+
+    return res
+      .status(200)
+      .json({ success: true, message: "OTP verified successfully" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server error", error });
+  }
+};
+const resetPassword = async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    const user = await User_Model.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    if (!user.otpVerified) {
+      return res.status(400).json({
+        message:
+          "OTP not verified. Please verify the OTP before resetting password",
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    user.password = hashedPassword;
+    user.resetOtp = undefined;
+    user.otpExpiry = undefined;
+    user.otpVerified = undefined;
+    await user.save();
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Password reset successfully" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server error", error });
+  }
+};
+const resendOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User_Model.findOne({ email });
+    if (!user) {
+      return res
+        .status(400)
+        .json({ message: "User with this email does not exist" });
+    }
+
+    const otp = generateOTP();
+
+    user.resetOtp = otp;
+    user.otpExpiry = Date.now() + 10 * 60 * 1000;
+    await user.save();
+
+    const emailText = `Your new OTP for password reset is ${otp}. This OTP is valid for 10 minutes.`;
+
+    await sendEmail(email, "Resend OTP for Password Reset", emailText);
+    return res
+      .status(200)
+      .json({ success: true, message: "OTP resend successfully" });
+  } catch (error) {
+    console.error("Server error:", error);
+    return res.status(500).json({ message: "Server error", error });
+  }
+};
+const changePassword = async (req, res) => {
+  try {
+    const { email, currentPassword, newPassword } = req.body;
+
+    const user = await User_Model.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Current password is incorrect" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    user.password = hashedPassword;
+    await user.save();
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Password changed successfully" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server error", error });
+  }
+};
+
+const editProfile = async (req, res) => {
+  try {
+    const {
+      name,
+      phoneNo,
+      gender,
+      profileImage,
+      country,
+      state,
+      city,
+      zipCode,
+      reasonForJoining,
+    } = req.body;
+    let updateData = {
+      name,
+      phoneNo,
+      gender,
+      profileImage,
+      country,
+      state,
+      city,
+      zipCode,
+      reasonForJoining,
+    };
+    const profile = await User_Model.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      {
+        new: true,
+        upsert: true,
+        runValidators: true,
+      }
+    );
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: "Profile not found",
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      data: profile,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update property",
+      error: error.message,
+    });
+  }
+};
+const logout = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const user = await User_Model.findOne({ _id: userId });
+    if (!user) {
+      return res
+        .status(400)
+        .json({ status: -1, message: "You have to register", success: false });
+    }
+
+    const userToken = await Token_Model.findOneAndUpdate(
+      { userId: user._id },
+      { accessToken: "", refreshToken: "" }
+    );
+    if (!userToken) {
+      return res.status(400).json({
+        message: "Something went wrong",
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Logout successfully",
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+module.exports = {
+  register,
+  login,
+  googleLogin,
+  forgetPassword,
+  verifyOtp,
+  resetPassword,
+  resendOtp,
+  changePassword,
+  editProfile,
+  logout,
+};
