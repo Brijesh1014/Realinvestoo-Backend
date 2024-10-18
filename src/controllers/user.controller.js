@@ -75,7 +75,7 @@ const editProfile = async (req, res) => {
     }
 
     const profile = await User_Model.findByIdAndUpdate(
-      req.params.id,
+      req.body.id,
       updateData,
       {
         new: true,

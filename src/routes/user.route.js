@@ -9,7 +9,7 @@ router.get(
   userController.getAllAgents
 );
 router.put(
-  "/editProfile/:id",
+  "/editProfile",
   auth(["isEmp", "isAdmin", "isProuser", "isAgent"]),
   userController.editProfile
 );
