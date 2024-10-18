@@ -8,5 +8,14 @@ router.get(
   auth(["isEmp", "isAdmin"]),
   userController.getAllAgents
 );
-
+router.put(
+  "/editProfile/:id",
+  auth(["isEmp", "isAdmin", "isProuser", "isAgent"]),
+  userController.editProfile
+);
+router.get(
+  "/getUserById/:id",
+  auth(["isEmp", "isAdmin"]),
+  userController.getUserById
+);
 module.exports = router;

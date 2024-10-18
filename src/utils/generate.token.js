@@ -1,13 +1,16 @@
 const jwt = require("jsonwebtoken");
 const UserToken = require("../models/token.model");
 
-const generateTokens = async (email, userId) => {
+const generateTokens = async (email, userId, isAdmin, isAgent, isEmp) => {
   try {
     const accessTokenExpiry = { expiresIn: "1d" };
     const refreshTokenExpiry = { expiresIn: "1d" };
     const payload = {
       email: email,
       id: userId,
+      isAdmin: isAdmin,
+      isAgent: isAgent,
+      isEmp: isEmp,
     };
     const accessToken = jwt.sign(
       payload,

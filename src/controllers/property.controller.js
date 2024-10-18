@@ -40,8 +40,8 @@ const getAllProperties = async (req, res) => {
       bestOffer,
       upcoming,
       recommended,
-      page = 1, 
-      limit = 10, 
+      page = 1,
+      limit = 10,
     } = req.query;
 
     const query = {};
@@ -106,7 +106,7 @@ const getAllProperties = async (req, res) => {
         currentPage: pageNumber,
         totalPages,
         remainingPages,
-        pageSize: properties.length, 
+        pageSize: properties.length,
       },
     });
   } catch (error) {
@@ -391,6 +391,59 @@ const getUserAppointments = async (req, res) => {
     });
   }
 };
+const updateAppointment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateAppointment = await Appointment.findByIdAndUpdate(
+      id,
+      req.body,
+      { new: true }
+    );
+    if (!updateAppointment) {
+      return res.status(404).json({
+        success: false,
+        message: "Appointment not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Appointment updated successfully",
+      data: updateAppointment,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error updating appointment",
+      error: error.message,
+    });
+  }
+};
+const deleteAppointment = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const deletedAppointment = await Appointment.findByIdAndDelete(id);
+
+    if (!deletedAppointment) {
+      return res.status(404).json({
+        success: false,
+        message: "Appointment not found",
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Appointment deleted successfully",
+      data: deletedAppointment,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error updating appointment",
+      error: error.message,
+    });
+  }
+};
 
 module.exports = {
   createProperty,
@@ -401,5 +454,8 @@ module.exports = {
   addReview,
   createAppointment,
   getAllAppointments,
+  getAppointmentById,
   getUserAppointments,
+  updateAppointment,
+  deleteAppointment,
 };

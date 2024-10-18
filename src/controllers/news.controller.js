@@ -124,7 +124,6 @@ const updateCategory = async (req, res) => {
       data: updatedCategory,
     });
   } catch (error) {
-    console.error("Error updating category:", error);
     return res.status(500).json({
       success: false,
       message: "Error updating category",

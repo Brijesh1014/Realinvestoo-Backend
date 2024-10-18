@@ -89,7 +89,13 @@ const login = async (req, res) => {
         .json({ success: false, message: "Password Does Not Match" });
     }
     const { accessToken, refreshToken, accessTokenExpiry, refreshTokenExpiry } =
-      await generateTokens.generateTokens(email, user._id);
+      await generateTokens.generateTokens(
+        email,
+        user._id,
+        user?.isAdmin,
+        user?.isAgent,
+        user?.isEmp
+      );
     return res.status(200).json({
       success: true,
       message: "Login successful",
@@ -122,7 +128,13 @@ const googleLogin = async (req, res) => {
         .json({ success: false, message: "User not found or not created." });
     }
     const { accessToken, refreshToken, accessTokenExpiry, refreshTokenExpiry } =
-      await generateTokens.generateTokens(email, user._id);
+      await generateTokens.generateTokens(
+        email,
+        user._id,
+        user?.isAdmin,
+        user?.isAgent,
+        user?.isEmp
+      );
     return res.status(200).json({
       success: true,
       message: "Login successful",
@@ -166,7 +178,13 @@ const googleAuth = async (req, res) => {
         refreshToken,
         accessTokenExpiry,
         refreshTokenExpiry,
-      } = await generateTokens.generateTokens(email, user._id);
+      } = await generateTokens.generateTokens(
+        email,
+        user._id,
+        user?.isAdmin,
+        user?.isAgent,
+        user?.isEmp
+      );
       return res.status(200).json({
         success: true,
         message: "Login successful",
@@ -335,59 +353,6 @@ const changePassword = async (req, res) => {
   }
 };
 
-const editProfile = async (req, res) => {
-  try {
-    const {
-      name,
-      phoneNo,
-      gender,
-      profileImage,
-      country,
-      state,
-      city,
-      zipCode,
-      reasonForJoining,
-    } = req.body;
-    let updateData = {
-      name,
-      phoneNo,
-      gender,
-      profileImage,
-      country,
-      state,
-      city,
-      zipCode,
-      reasonForJoining,
-    };
-    const profile = await User_Model.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      {
-        new: true,
-        upsert: true,
-        runValidators: true,
-      }
-    );
-    if (!profile) {
-      return res.status(404).json({
-        success: false,
-        message: "Profile not found",
-      });
-    }
-    return res.status(200).json({
-      success: true,
-      message: "Profile updated successfully",
-      data: profile,
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update property",
-      error: error.message,
-    });
-  }
-};
 const logout = async (req, res) => {
   try {
     const userId = req.userId;
@@ -427,7 +392,6 @@ module.exports = {
   resetPassword,
   resendOtp,
   changePassword,
-  editProfile,
   logout,
   googleAuth,
 };

@@ -28,11 +28,6 @@ router.put("/resetPassword", authController.resetPassword);
 router.post("/resendOtp", authController.resendOtp);
 router.post("/changePassword", authController.changePassword);
 router.post(
-  "/editProfile/:id",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent"]),
-  authController.editProfile
-);
-router.post(
   "/logout",
   auth(["isEmp", "isAdmin", "isProuser", "isAgent"]),
   authController.logout

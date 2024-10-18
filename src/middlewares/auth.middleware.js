@@ -43,6 +43,10 @@ const auth =
 
       req.userId = decoded.id;
       req.userEmail = decoded.email;
+      req.isAdmin = decoded.isAdmin;
+      req.isAgent = decoded.isAgent;
+      req.isEmp = decoded.isEmp;
+
       next();
     } catch (err) {
       return res
