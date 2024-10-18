@@ -370,7 +370,11 @@ const getUserAppointments = async (req, res) => {
   try {
     const appointment = await Appointment.find(
       { user: req.userId } || { agent: req.userId } || { createdBy: req.userId }
-    );
+    )
+      .populate("property", "propertyName propertyType")
+      .populate("user", "name email phoneNo")
+      .populate("agent", "name email phoneNo")
+      .populate("createdBy", "name email phoneNo");
     if (!appointment) {
       return res.status(404).json({
         success: false,

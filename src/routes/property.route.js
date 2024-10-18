@@ -51,4 +51,28 @@ router.get(
   propertyController.getAllAppointments
 );
 
+router.get(
+  "/getAppointmentById/:id",
+  auth(["isEmp", "isAdmin"]),
+  propertyController.getAppointmentById
+);
+
+router.get(
+  "/getUserAppointments",
+  auth(["isEmp", "isAdmin"]),
+  propertyController.getUserAppointments
+);
+
+router.put(
+  "/updateAppointment/:id",
+  auth(["isEmp", "isAdmin"]),
+  propertyController.updateAppointment
+);
+
+router.delete(
+  "/deleteAppointment/:id",
+  auth(["isEmp", "isAdmin"]),
+  propertyController.deleteAppointment
+);
+
 module.exports = router;
