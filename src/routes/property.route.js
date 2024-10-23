@@ -2,10 +2,12 @@ const express = require("express");
 const router = express.Router();
 const propertyController = require("../controllers/property.controller");
 const auth = require("../middlewares/auth.middleware");
+const upload = require("../services/multer.service");
 
 router.post(
   "/createProperty",
   auth(["isEmp", "isAdmin"]),
+  upload.fields([{ name: "mainPhoto", maxCount: 1 }]),
   propertyController.createProperty
 );
 
@@ -23,8 +25,22 @@ router.get(
 
 router.put(
   "/updateProperty/:id",
+  upload.single("mainPhoto"),
   auth(["isEmp", "isAdmin"]),
   propertyController.updateProperty
+);
+
+router.put(
+  "/uploadNewSliderImages/:id",
+  upload.fields([{ name: "sliderPhotos", maxCount: 10 }]),
+  auth(["isEmp", "isAdmin"]),
+  propertyController.uploadNewSliderPhoto
+);
+
+router.post(
+  "/removeSliderImages",
+  auth(["isEmp", "isAdmin"]),
+  propertyController.removeSliderImages
 );
 
 router.delete(

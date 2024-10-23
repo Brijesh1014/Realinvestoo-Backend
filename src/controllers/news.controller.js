@@ -1,5 +1,9 @@
 const News = require("../models/news.model");
 const NewsCategory = require("../models/newsCategory.model");
+const {
+  uploadToCloudinary,
+  cloudinary,
+} = require("../services/cloudinary.service");
 
 const createCategory = async (req, res) => {
   try {
@@ -173,6 +177,11 @@ const createNews = async (req, res) => {
       });
     }
 
+    let imageUrl;
+    if (req.file) {
+      imageUrl = await uploadToCloudinary(req.file);
+    }
+
     const news = new News({
       title,
       category,
@@ -181,6 +190,7 @@ const createNews = async (req, res) => {
       creatorName,
       dateOfPost: dateOfPost || new Date(),
       createdBy: req.userId,
+      image: imageUrl || null,
     });
 
     await news.save();
@@ -275,36 +285,59 @@ const getNewsById = async (req, res) => {
 const updateNews = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, category, description, image, creatorName, dateOfPost } =
-      req.body;
+    const { title, category, description, creatorName, dateOfPost } = req.body;
 
-    const existingCategory = await NewsCategory.findById(category);
-    if (!existingCategory) {
+    if (category) {
+      const existingCategory = await NewsCategory.findById(category);
+      if (!existingCategory) {
+        return res.status(404).json({
+          success: false,
+          message: "Category not found",
+        });
+      }
+    }
+
+    // Fetch the existing news item
+    const existingNews = await News.findById(id);
+    if (!existingNews) {
       return res.status(404).json({
         success: false,
-        message: "Category not found",
+        message: "News not found",
       });
     }
 
+    let imageUrl = existingNews.image;
+    if (req.file) {
+      let existingImagePublicId;
+      if (existingNews.image) {
+        existingImagePublicId = existingNews.image
+          .split("/")
+          .pop()
+          .split(".")[0];
+
+        const uploadResult = await cloudinary.uploader.upload(req.file.path, {
+          public_id: existingImagePublicId,
+          overwrite: true,
+        });
+
+        imageUrl = uploadResult.secure_url;
+      } else {
+        const uploadResult = await cloudinary.uploader.upload(req.file.path);
+        imageUrl = uploadResult.secure_url;
+      }
+    }
     const updatedNews = await News.findByIdAndUpdate(
       id,
       {
         title,
         category,
         description,
-        image,
         creatorName,
         dateOfPost: dateOfPost || new Date(),
+        image: imageUrl,
       },
       { new: true }
     );
-
-    if (!updatedNews) {
-      return res.status(404).json({
-        success: false,
-        message: "News not found",
-      });
-    }
 
     return res.status(200).json({
       success: true,
@@ -325,19 +358,25 @@ const deleteNews = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const deletedNews = await News.findByIdAndDelete(id);
+    const news = await News.findById(id);
 
-    if (!deletedNews) {
+    if (!news) {
       return res.status(404).json({
         success: false,
         message: "News not found",
       });
     }
 
+    if (news.image) {
+      const imagePublicId = news.image.split("/").pop().split(".")[0];
+      await cloudinary.uploader.destroy(imagePublicId);
+    }
+    await News.findByIdAndDelete(req.params.id);
+
     return res.status(200).json({
       success: true,
       message: "News deleted successfully",
-      data: deletedNews,
+      data: news,
     });
   } catch (error) {
     console.error("Error deleting news:", error);

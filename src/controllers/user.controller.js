@@ -1,4 +1,5 @@
 const User_Model = require("../models/user.model");
+const { uploadToCloudinary } = require("../services/cloudinary.service");
 
 const getAllAgents = async (req, res) => {
   try {
@@ -43,7 +44,6 @@ const editProfile = async (req, res) => {
       name,
       phoneNo,
       gender,
-      profileImage,
       country,
       state,
       city,
@@ -55,13 +55,34 @@ const editProfile = async (req, res) => {
       name,
       phoneNo,
       gender,
-      profileImage,
       country,
       state,
       city,
       zipCode,
       reasonForJoining,
     };
+
+    let profileImageUrl;
+
+    if (req.file) {
+      const existingProfile = await User_Model.findById(req.body.id);
+      if (existingProfile && existingProfile.profileImage) {
+        const existingImagePublicId = existingProfile.profileImage
+          .split("/")
+          .pop()
+          .split(".")[0];
+
+        const uploadResult = await cloudinary.uploader.upload(req.file.path, {
+          public_id: existingImagePublicId,
+          overwrite: true,
+        });
+
+        profileImageUrl = uploadResult.secure_url;
+      } else {
+        const uploadResult = await uploadToCloudinary(req.file);
+        profileImageUrl = uploadResult;
+      }
+    }
 
     if (req.isAdmin === true) {
       const { isAdmin, isAgent, isEmp, isProuser } = req.body;
@@ -72,6 +93,10 @@ const editProfile = async (req, res) => {
         isEmp,
         isProuser,
       };
+    }
+
+    if (profileImageUrl) {
+      updateData.profileImage = profileImageUrl;
     }
 
     const profile = await User_Model.findByIdAndUpdate(
@@ -97,7 +122,7 @@ const editProfile = async (req, res) => {
       data: profile,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error updating profile:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to update profile",

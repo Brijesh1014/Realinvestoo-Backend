@@ -1,4 +1,5 @@
 const User_Model = require("../models/user.model");
+const { cloudinary } = require("../services/cloudinary.service");
 
 const getAllUsers = async (req, res) => {
   try {
@@ -37,6 +38,38 @@ const getAllUsers = async (req, res) => {
   }
 };
 
+const deleteUser = async (req, res) => {
+  try {
+    const user = await User_Model.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+    if (user.profileImage) {
+      const profileImagePublicId = user.profileImage
+        .split("/")
+        .pop()
+        .split(".")[0];
+      await cloudinary.uploader.destroy(profileImagePublicId);
+    }
+    await User_Model.findByIdAndDelete(req.params.id);
+    return res.status(200).json({
+      success: true,
+      message: "User deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting User: ", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete User",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
+  deleteUser,
 };

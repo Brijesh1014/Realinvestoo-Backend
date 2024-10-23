@@ -3,8 +3,8 @@ const UserToken = require("../models/token.model");
 
 const generateTokens = async (email, userId, isAdmin, isAgent, isEmp) => {
   try {
-    const accessTokenExpiry = { expiresIn: "1d" };
-    const refreshTokenExpiry = { expiresIn: "1d" };
+    const accessTokenExpiry = process.env.ACCESS_TOKEN_EXPIRY;
+    const refreshTokenExpiry = process.env.REFRESH_TOKEN_EXPIRY;
     const payload = {
       email: email,
       id: userId,
@@ -15,12 +15,12 @@ const generateTokens = async (email, userId, isAdmin, isAgent, isEmp) => {
     const accessToken = jwt.sign(
       payload,
       process.env.ACCESS_TOKEN_PRIVATE_KEY,
-      accessTokenExpiry
+      { expiresIn: accessTokenExpiry }
     );
     const refreshToken = jwt.sign(
       payload,
       process.env.REFRESH_TOKEN_PRIVATE_KEY,
-      refreshTokenExpiry
+      { expiresIn: refreshTokenExpiry }
     );
     let userToken = await UserToken.findOne({ userId: userId });
     if (userToken) await userToken.deleteOne();

@@ -1,18 +1,45 @@
 const Property = require("../models/property.model");
 const Appointment = require("../models/appointment.model");
 const User = require("../models/user.model");
+const {
+  uploadToCloudinary,
+  cloudinary,
+} = require("../services/cloudinary.service");
 
 const createProperty = async (req, res) => {
   try {
-    const property = new Property(req.body);
-    await property.save();
+    let mainPhotoUrl = null;
+    if (req.files && req.files.mainPhoto && req.files.mainPhoto[0]) {
+      const mainPhoto = req.files.mainPhoto[0];
+      mainPhotoUrl = await uploadToCloudinary(mainPhoto);
+    }
+    let sliderPhotosUrl = [];
+    if (
+      req.files &&
+      req.files.sliderPhotos &&
+      req.files.sliderPhotos.length > 0
+    ) {
+      const sliderPhotos = req.files.sliderPhotos;
+      for (const photo of sliderPhotos) {
+        const photoUrl = await uploadToCloudinary(photo);
+        sliderPhotosUrl.push(photoUrl);
+      }
+    }
+
+    const propertyDetails = new Property({
+      mainPhoto: mainPhotoUrl || null,
+      sliderPhotos: sliderPhotosUrl.length > 0 ? sliderPhotosUrl : null,
+      ...req.body,
+    });
+
+    const propertyData = await propertyDetails.save();
     return res.status(201).json({
       success: true,
       message: "Property created successfully",
-      data: property,
+      data: propertyData,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error creating property: ", error);
     return res.status(500).json({
       success: false,
       message: "Failed to create property",
@@ -145,24 +172,52 @@ const getPropertyById = async (req, res) => {
 
 const updateProperty = async (req, res) => {
   try {
-    const property = await Property.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      upsert: true,
-      runValidators: true,
-    });
+    let property = await Property.findById(req.params.id);
     if (!property) {
       return res.status(404).json({
         success: false,
         message: "Property not found",
       });
     }
+
+    if (req.file) {
+      const existingProperty = await Property.findById(req.body.id);
+      if (existingProperty && existingProperty.mainPhoto) {
+        const existingMainPhotoPublicId = existingProperty.mainPhoto
+          .split("/")
+          .pop()
+          .split(".")[0];
+
+        const uploadResult = await cloudinary.uploader.upload(req.file.path, {
+          public_id: existingMainPhotoPublicId,
+          overwrite: true,
+        });
+
+        req.body.mainPhoto = uploadResult.secure_url;
+      } else {
+        const uploadResult = await uploadToCloudinary(req.file);
+        req.body.mainPhoto = uploadResult;
+      }
+    }
+
+    property = await Property.findByIdAndUpdate(
+      req.params.id,
+      {
+        ...req.body,
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
     return res.status(200).json({
       success: true,
       message: "Property updated successfully",
       data: property,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error updating property: ", error);
     return res.status(500).json({
       success: false,
       message: "Failed to update property",
@@ -171,21 +226,116 @@ const updateProperty = async (req, res) => {
   }
 };
 
+const uploadNewSliderPhoto = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (
+      !req.files ||
+      !req.files.sliderPhotos ||
+      req.files.sliderPhotos.length === 0
+    ) {
+      return res.status(400).json({ message: "No files uploaded" });
+    }
+
+    const newImageUrls = [];
+    const sliderPhotos = req.files.sliderPhotos;
+
+    for (const file of sliderPhotos) {
+      const uploadResponse = await cloudinary.uploader.upload(file.path);
+      newImageUrls.push(uploadResponse.secure_url);
+    }
+
+    await Property.updateOne(
+      { _id: id },
+      { $addToSet: { sliderPhotos: { $each: newImageUrls } } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Slider photos uploaded successfully",
+      data: newImageUrls,
+    });
+  } catch (error) {
+    console.error(error);
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
+const removeSliderImages = async (req, res) => {
+  try {
+    const { sliderPhotos, id } = req.body;
+    if (
+      !sliderPhotos ||
+      !Array.isArray(sliderPhotos) ||
+      sliderPhotos.length === 0
+    ) {
+      return res
+        .status(400)
+        .json({ message: "No images specified for removal" });
+    }
+
+    const existingProperty = await Property.findById(id);
+    if (!existingProperty) {
+      return res.status(404).json({ message: "Property not found" });
+    }
+    for (const image of sliderPhotos) {
+      const publicId = image.split("/").pop().split(".")[0];
+
+      await cloudinary.uploader.destroy(publicId);
+    }
+
+    await Property.updateOne(
+      { _id: id },
+      { $pull: { sliderPhotos: { $in: sliderPhotos } } }
+    );
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Slider images removed successfully" });
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
 const deleteProperty = async (req, res) => {
   try {
-    const property = await Property.findByIdAndDelete(req.params.id);
+    const property = await Property.findById(req.params.id);
     if (!property) {
       return res.status(404).json({
         success: false,
         message: "Property not found",
       });
     }
+
+    if (property.mainPhoto) {
+      const mainPhotoPublicId = property.mainPhoto
+        .split("/")
+        .pop()
+        .split(".")[0];
+      await cloudinary.uploader.destroy(mainPhotoPublicId);
+    }
+
+    if (property.sliderPhotos && property.sliderPhotos.length > 0) {
+      const deletePromises = property.sliderPhotos.map(async (photoUrl) => {
+        const publicId = photoUrl.split("/").pop().split(".")[0];
+        return cloudinary.uploader.destroy(publicId);
+      });
+      await Promise.all(deletePromises);
+    }
+
+    await Property.findByIdAndDelete(req.params.id);
+
     return res.status(200).json({
       success: true,
       message: "Property deleted successfully",
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error deleting property: ", error);
     return res.status(500).json({
       success: false,
       message: "Failed to delete property",
@@ -198,7 +348,6 @@ const addReview = async (req, res) => {
   const { propertyId } = req.params;
   const { rating, review } = req.body;
   const userId = req.userId;
-  console.log("userId: ", userId);
 
   try {
     const property = await Property.findById(propertyId);
@@ -306,10 +455,10 @@ const getAllAppointments = async (req, res) => {
     const totalCategoriesCount = await Appointment.countDocuments();
 
     const appointments = await Appointment.find()
-      .populate("property", "propertyName propertyType")
-      .populate("user", "name email phoneNo")
-      .populate("agent", "name email phoneNo")
-      .populate("createdBy", "name email phoneNo")
+      .populate("property", "propertyName mainPhoto sliderPhotos propertyType")
+      .populate("user", "name email profileImage phoneNo")
+      .populate("agent", "name email profileImage phoneNo")
+      .populate("createdBy", "name email profileImage phoneNo")
       .skip(skip)
       .limit(pageSize);
 
@@ -342,10 +491,10 @@ const getAppointmentById = async (req, res) => {
   try {
     const { id } = req.params;
     const appointment = await Appointment.findById(id)
-      .populate("property", "propertyName propertyType")
-      .populate("user", "name email phoneNo")
-      .populate("agent", "name email phoneNo")
-      .populate("createdBy", "name email phoneNo");
+      .populate("property", "propertyName mainPhoto sliderPhotos propertyType")
+      .populate("user", "name email profileImage phoneNo")
+      .populate("agent", "name email profileImage phoneNo")
+      .populate("createdBy", "name email profileImage phoneNo");
     if (!appointment) {
       return res.status(404).json({
         success: false,
@@ -371,10 +520,10 @@ const getUserAppointments = async (req, res) => {
     const appointment = await Appointment.find(
       { user: req.userId } || { agent: req.userId } || { createdBy: req.userId }
     )
-      .populate("property", "propertyName propertyType")
-      .populate("user", "name email phoneNo")
-      .populate("agent", "name email phoneNo")
-      .populate("createdBy", "name email phoneNo");
+      .populate("property", "propertyName mainPhoto sliderPhotos propertyType")
+      .populate("user", "name email profileImage phoneNo")
+      .populate("agent", "name email profileImage phoneNo")
+      .populate("createdBy", "name email profileImage phoneNo");
     if (!appointment) {
       return res.status(404).json({
         success: false,
@@ -454,6 +603,8 @@ module.exports = {
   getAllProperties,
   getPropertyById,
   updateProperty,
+  uploadNewSliderPhoto,
+  removeSliderImages,
   deleteProperty,
   addReview,
   createAppointment,

@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const newsController = require("../controllers/news.controller");
 const auth = require("../middlewares/auth.middleware");
+const upload = require("../services/multer.service");
 
 router.post(
   "/createCategory",
@@ -21,11 +22,17 @@ router.delete(
   newsController.deleteCategory
 );
 
-router.post("/createNews", auth(["isAdmin"]), newsController.createNews);
+router.post(
+  "/createNews",
+  upload.single("image"),
+  auth(["isAdmin"]),
+  newsController.createNews
+);
 router.get("/getAllNews", newsController.getAllNews);
 router.get("/getNewsById/:id", newsController.getNewsById);
 router.put(
   "/updateNews/:id",
+  upload.single("image"),
   auth(["isEmp", "isAdmin"]),
   newsController.updateNews
 );

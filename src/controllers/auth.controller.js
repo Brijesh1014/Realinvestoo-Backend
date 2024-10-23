@@ -5,6 +5,7 @@ const bcrypt = require("bcrypt");
 const generateTokens = require("../utils/generate.token");
 const dotenv = require("dotenv");
 const sendEmail = require("../services/email.service");
+const jwt = require("jsonwebtoken");
 dotenv.config();
 
 const register = async (req, res) => {
@@ -107,6 +108,71 @@ const login = async (req, res) => {
     });
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+const refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Refresh token is required." });
+    }
+    jwt.verify(
+      refreshToken,
+      process.env.REFRESH_TOKEN_PRIVATE_KEY,
+      async (err, user) => {
+        if (err) {
+          return res
+            .status(403)
+            .json({ success: false, message: "Invalid refresh token." });
+        }
+
+        const userToken = await Token_Model.findOne({
+          userId: user.id,
+          refreshToken,
+        });
+        if (!userToken) {
+          return res
+            .status(403)
+            .json({ success: false, message: "Refresh token not found." });
+        }
+
+        const newAccessToken = jwt.sign(
+          {
+            id: user.id,
+            email: user.email,
+            isAdmin: user?.isAdmin,
+            isAgent: user?.isAgent,
+            isEmp: user?.isEmp,
+          },
+          process.env.ACCESS_TOKEN_PRIVATE_KEY,
+          { expiresIn: process.env.ACCESS_TOKEN_EXPIRY }
+        );
+        if (!newAccessToken) {
+          return res.status(400).json({
+            success: false,
+            message: "Something went wrong",
+          });
+        }
+        await Token_Model.findOneAndUpdate(
+          { userId: user?.id },
+          { accessToken: newAccessToken }
+        );
+
+        return res
+          .status(200)
+          .json({ success: true, accessToken: newAccessToken });
+      }
+    );
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error.",
+      error: error.message,
+    });
   }
 };
 
@@ -386,6 +452,7 @@ const logout = async (req, res) => {
 module.exports = {
   register,
   login,
+  refreshToken,
   googleLogin,
   forgetPassword,
   verifyOtp,
