@@ -33,35 +33,15 @@ const createCategory = async (req, res) => {
 
 const getAllCategories = async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
-
-    const pageNumber = parseInt(page);
-    const pageSize = parseInt(limit);
-
-    const skip = (pageNumber - 1) * pageSize;
-
-    const totalCategoriesCount = await NewsCategory.countDocuments();
-
-    const categories = await NewsCategory.find()
-      .populate("createdBy", "username")
-      .skip(skip)
-      .limit(pageSize);
-
-    const totalPages = Math.ceil(totalCategoriesCount / pageSize);
-    const remainingPages =
-      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
+    const categories = await NewsCategory.find().populate(
+      "createdBy",
+      "username"
+    );
 
     return res.status(200).json({
       success: true,
       message: "Fetched all categories successfully",
       data: categories,
-      meta: {
-        totalCategoriesCount,
-        currentPage: pageNumber,
-        totalPages,
-        remainingPages,
-        pageSize: categories.length,
-      },
     });
   } catch (error) {
     console.error("Error fetching categories:", error);
