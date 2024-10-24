@@ -67,34 +67,27 @@ const getAllProperties = async (req, res) => {
       bestOffer,
       upcoming,
       recommended,
+      timeFilter, 
       page = 1,
       limit = 10,
     } = req.query;
 
     const query = {};
 
+    // Filters
     if (location) query.address = { $regex: location, $options: "i" };
-
     if (type) query.propertyType = type;
-
     if (minPrice || maxPrice) {
-      query.amount = { $gte: minPrice || 0, $lte: maxPrice || 1000000 };
+      query.price = { $gte: minPrice || 0, $lte: maxPrice || 1000000 };
     }
-
     if (minSize || maxSize) {
       query.propertySize = { $gte: minSize || 0, $lte: maxSize || 1000000 };
     }
-
     if (bedrooms) query.bedroom = { $gte: bedrooms };
-
     if (bathrooms) query.bathroom = { $gte: bathrooms };
-
     if (kitchen) query.kitchen = { $gte: kitchen };
-
     if (parking) query.parking = { $gte: parking };
-
     if (amenities) query.amenities = { $all: amenities.split(",") };
-
     if (search) {
       query.$or = [
         { propertyName: { $regex: search, $options: "i" } },
@@ -102,22 +95,61 @@ const getAllProperties = async (req, res) => {
         { address: { $regex: search, $options: "i" } },
       ];
     }
-
     if (topRated) query.ratings = { $gte: 4 };
-
     if (bestOffer) query.bestOffer = true;
-
     if (upcoming) query.new = true;
-
     if (recommended) query.recommended = true;
 
+    // Time Filters
+    if (timeFilter) {
+      const now = new Date();
+      let startDate;
+      switch (timeFilter) {
+        case "week":
+          startDate = new Date(now.setDate(now.getDate() - 7));
+          break;
+        case "month":
+          startDate = new Date(now.setMonth(now.getMonth() - 1));
+          break;
+        case "year":
+          startDate = new Date(now.setFullYear(now.getFullYear() - 1));
+          break;
+        default:
+          break;
+      }
+      if (startDate) {
+        query.createdAt = { $gte: startDate };
+      }
+    }
+
+    // Pagination
     const pageNumber = parseInt(page);
     const pageSize = parseInt(limit);
-
     const skip = (pageNumber - 1) * pageSize;
 
+    // Query for total properties
     const totalProperties = await Property.countDocuments(query);
 
+    // Query for sold properties
+    const soldProperties = await Property.countDocuments({
+      ...query,
+      rentOrSale: "Sold",
+    });
+
+    // Query for rent properties
+    const rentProperties = await Property.countDocuments({
+      ...query,
+      rentOrSale: "Rent",
+    });
+
+    // Query for vacant properties (visible = true and not sold)
+    const vacantProperties = await Property.countDocuments({
+      ...query,
+      rentOrSale: { $ne: "Sold" },
+      visible: true,
+    });
+
+    // Fetch paginated properties
     const properties = await Property.find(query).skip(skip).limit(pageSize);
 
     const totalPages = Math.ceil(totalProperties / pageSize);
@@ -130,6 +162,9 @@ const getAllProperties = async (req, res) => {
       data: properties,
       meta: {
         totalProperties,
+        soldProperties,
+        rentProperties,
+        vacantProperties,
         currentPage: pageNumber,
         totalPages,
         remainingPages,

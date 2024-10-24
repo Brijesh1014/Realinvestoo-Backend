@@ -14,10 +14,13 @@ const newsRoute = require("./src/routes/news.route");
 const chatRoute = require("./src/routes/chat.route");
 const messageRoute = require("./src/routes/message.route");
 const couponRoute = require("./src/routes/coupon.route");
+const favoritesRoute = require("./src/routes/favorites.route");
+const faqRoute = require("./src/routes/faq.route");
+const contactUsRoute = require("./src/routes/contactUs.route");
 const initSocketIo = require("./src/services/socket.service");
 
 app.set("view engine", "ejs");
-const viewsDir = path.join(__dirname, "../src/views");
+const viewsDir = path.join(__dirname, "./src/views");
 app.set("views", viewsDir);
 
 const staticDir = path.join(__dirname, "public");
@@ -42,6 +45,9 @@ app.use("/news", newsRoute);
 app.use("/chat", chatRoute);
 app.use("/message", messageRoute);
 app.use("/coupon", couponRoute);
+app.use("/favorites", favoritesRoute);
+app.use("/faq", faqRoute);
+app.use("/contactUs", contactUsRoute);
 const server = app.listen(PORT, () => {
   console.log(`Server up and running on port ${PORT}!`);
 });

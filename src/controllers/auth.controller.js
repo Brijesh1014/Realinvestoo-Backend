@@ -4,7 +4,7 @@ const { OAuth2Client } = require("google-auth-library");
 const bcrypt = require("bcrypt");
 const generateTokens = require("../utils/generate.token");
 const dotenv = require("dotenv");
-const sendEmail = require("../services/email.service");
+const { sendEmail } = require("../utils/email.utils");
 const jwt = require("jsonwebtoken");
 dotenv.config();
 

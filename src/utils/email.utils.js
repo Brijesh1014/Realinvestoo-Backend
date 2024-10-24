@@ -8,12 +8,13 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const sendEmail = (to, subject, text) => {
+const sendEmail = (to, subject, text, html = null) => {
   const mailOptions = {
     from: process.env.EMAIL_SENDER_EMAIL,
     to,
     subject,
     text,
+    ...(html && { html }),
   };
 
   return new Promise((resolve, reject) => {
@@ -29,4 +30,20 @@ const sendEmail = (to, subject, text) => {
   });
 };
 
-module.exports = sendEmail;
+async function nodeMailerFunc(from, to, subject, text, html) {
+  const mailOptions = {
+    from,
+    to,
+    subject,
+    text,
+    html,
+  };
+
+  let response = await transporter.sendMail(mailOptions);
+  return response;
+}
+
+module.exports = {
+  sendEmail,
+  nodeMailerFunc,
+};
