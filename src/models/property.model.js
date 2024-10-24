@@ -12,7 +12,7 @@ const reviewSchema = new mongoose.Schema(
 const propertySchema = new mongoose.Schema(
   {
     propertyName: { type: String },
-    propertyType: { type: String, enum: ["Rent", "Sale"] },
+    propertyType: { type: String },
     propertySize: { type: Number },
     rentOrSale: { type: String, enum: ["Rent", "Sale"] },
     agent: { type: String },
@@ -39,6 +39,7 @@ const propertySchema = new mongoose.Schema(
     recommended: { type: Boolean, default: false },
     ratings: { type: Number, default: 0 },
     reviews: [reviewSchema],
+    favourite: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },
   { timestamps: true }
 );
