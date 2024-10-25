@@ -94,4 +94,6 @@ router.delete(
   propertyController.deleteAppointment
 );
 
+router.get("/analyticDashboard", propertyController.analyticDashboard);
+
 module.exports = router;

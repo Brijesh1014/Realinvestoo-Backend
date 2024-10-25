@@ -5,6 +5,7 @@ const {
   uploadToCloudinary,
   cloudinary,
 } = require("../services/cloudinary.service");
+const Favorites = require("../models/favorites.model");
 
 const createProperty = async (req, res) => {
   try {
@@ -67,7 +68,7 @@ const getAllProperties = async (req, res) => {
       bestOffer,
       upcoming,
       recommended,
-      timeFilter, 
+      timeFilter,
       page = 1,
       limit = 10,
     } = req.query;
@@ -150,7 +151,10 @@ const getAllProperties = async (req, res) => {
     });
 
     // Fetch paginated properties
-    const properties = await Property.find(query).skip(skip).limit(pageSize);
+    const properties = await Property.find(query)
+      .skip(skip)
+      .limit(pageSize)
+      .sort({ createdAt: -1 });
 
     const totalPages = Math.ceil(totalProperties / pageSize);
     const remainingPages =
@@ -633,6 +637,79 @@ const deleteAppointment = async (req, res) => {
   }
 };
 
+const analyticDashboard = async (req, res) => {
+  try {
+    const topFavoriteProperties = await Favorites.aggregate([
+      {
+        $group: {
+          _id: "$propertyId",
+          favouriteCount: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { favouriteCount: -1 },
+      },
+      {
+        $limit: 5,
+      },
+      {
+        $project: {
+          _id: 0,
+          propertyId: "$_id",
+          favouriteCount: 1,
+        },
+      },
+    ]);
+
+    const soldProperties = await Property.aggregate([
+      {
+        $match: { rentOrSale: "Sold" },
+      },
+      {
+        $group: {
+          _id: {
+            month: { $month: "$updatedAt" },
+            year: { $year: "$updatedAt" },
+          },
+          propertiesSold: { $sum: 1 },
+        },
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } },
+    ]);
+
+    const recentProperties = await Property.find({})
+      .sort({ createdAt: -1 })
+      .limit(5);
+    const totalProperties = await Property.countDocuments();
+
+    const totalCustomers = await User.countDocuments({
+      $or: [{ isEmp: true }, { isAgent: true }, { isProuser: true }],
+    });
+
+    const totalSold = await Property.countDocuments({ rentOrSale: "Sold" });
+    const totalRent = await Property.countDocuments({ rentOrSale: "Rent" });
+    const totalVacant = await Property.countDocuments({
+      rentOrSale: { $ne: "Sold" },
+      visible: true,
+    });
+
+    res.status(200).json({
+      soldProperties,
+      topFavoriteProperties,
+      recentProperties,
+      totalProperties,
+      totalCustomers,
+      totalSold,
+      totalRent,
+      totalVacant,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch analytics data" });
+  }
+};
+
+module.exports = analyticDashboard;
+
 module.exports = {
   createProperty,
   getAllProperties,
@@ -648,4 +725,5 @@ module.exports = {
   getUserAppointments,
   updateAppointment,
   deleteAppointment,
+  analyticDashboard,
 };
