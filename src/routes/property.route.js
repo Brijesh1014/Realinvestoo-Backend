@@ -7,7 +7,10 @@ const upload = require("../services/multer.service");
 router.post(
   "/createProperty",
   auth(["isEmp", "isAdmin"]),
-  upload.fields([{ name: "mainPhoto", maxCount: 1 }]),
+  upload.fields([
+    { name: "mainPhoto", maxCount: 1 },
+    { name: "sliderPhotos", maxCount: 10 },
+  ]),
   propertyController.createProperty
 );
 
