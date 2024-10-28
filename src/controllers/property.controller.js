@@ -109,6 +109,7 @@ const getAllProperties = async (req, res) => {
     if (upcoming) query.new = true;
     if (recommended) query.recommended = true;
     if (isFeatured) query.featured = true;
+    if (isFeatured) query.featured = false;
 
     // Time Filters
     if (timeFilter) {
@@ -667,10 +668,21 @@ const analyticDashboard = async (req, res) => {
         $limit: 5,
       },
       {
+        $lookup: {
+          from: "properties",
+          localField: "_id",
+          foreignField: "_id",
+          as: "propertyDetails",
+        },
+      },
+      {
+        $unwind: "$propertyDetails",
+      },
+      {
         $project: {
           _id: 0,
-          propertyId: "$_id",
           favouriteCount: 1,
+          propertyDetails: 1,
         },
       },
     ]);
@@ -682,18 +694,42 @@ const analyticDashboard = async (req, res) => {
       {
         $group: {
           _id: {
+            propertyId: "$_id",
             month: { $month: "$updatedAt" },
             year: { $year: "$updatedAt" },
           },
           propertiesSold: { $sum: 1 },
         },
       },
-      { $sort: { "_id.year": 1, "_id.month": 1 } },
+      {
+        $lookup: {
+          from: "properties",
+          localField: "_id.propertyId",
+          foreignField: "_id",
+          as: "propertyDetails",
+        },
+      },
+      {
+        $unwind: "$propertyDetails",
+      },
+      {
+        $sort: { "_id.year": 1, "_id.month": 1 },
+      },
+      {
+        $project: {
+          _id: 0,
+          month: "$_id.month",
+          year: "$_id.year",
+          propertiesSold: 1,
+          propertyDetails: 1,
+        },
+      },
     ]);
 
     const recentProperties = await Property.find({})
       .sort({ createdAt: -1 })
       .limit(5);
+
     const totalProperties = await Property.countDocuments();
 
     const totalCustomers = await User.countDocuments({
@@ -748,7 +784,7 @@ const getPropertyByAgentId = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Error updating appointment",
+      message: "Error getting properties",
       error: error.message,
     });
   }
