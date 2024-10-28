@@ -82,13 +82,20 @@ const login = async (req, res) => {
         .status(400)
         .json({ status: -1, message: "You have to register", success: false });
     }
-    const match = await bcrypt.compare(password, user.password);
 
+    const match = await bcrypt.compare(password, user.password);
     if (!match) {
       return res
         .status(400)
         .json({ success: false, message: "Password Does Not Match" });
     }
+
+    await Token_Model.findOneAndUpdate(
+      { userId: user._id },
+      { accessToken: "", refreshToken: "" },
+      { new: true }
+    );
+
     const { accessToken, refreshToken, accessTokenExpiry, refreshTokenExpiry } =
       await generateTokens.generateTokens(
         email,
@@ -97,6 +104,15 @@ const login = async (req, res) => {
         user?.isAgent,
         user?.isEmp
       );
+
+    await Token_Model.create({
+      userId: user._id,
+      accessToken,
+      refreshToken,
+      accessTokenExpiry,
+      refreshTokenExpiry,
+    });
+
     return res.status(200).json({
       success: true,
       message: "Login successful",
