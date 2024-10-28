@@ -445,15 +445,11 @@ const logout = async (req, res) => {
         .json({ status: -1, message: "You have to register", success: false });
     }
 
-    const userToken = await Token_Model.findOneAndUpdate(
+    await Token_Model.findOneAndUpdate(
       { userId: user._id },
       { accessToken: "", refreshToken: "" }
     );
-    if (!userToken) {
-      return res.status(400).json({
-        message: "Something went wrong",
-      });
-    }
+
     return res.status(200).json({
       success: true,
       message: "Logout successfully",
