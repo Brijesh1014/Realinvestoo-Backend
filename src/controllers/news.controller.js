@@ -1,3 +1,4 @@
+const { default: mongoose } = require("mongoose");
 const News = require("../models/news.model");
 const NewsCategory = require("../models/newsCategory.model");
 const {
@@ -129,6 +130,8 @@ const deleteCategory = async (req, res) => {
       });
     }
 
+    await News.updateMany({ category: id }, { $set: { category: null } });
+
     return res.status(200).json({
       success: true,
       message: "Category deleted successfully",
@@ -146,14 +149,51 @@ const deleteCategory = async (req, res) => {
 
 const createNews = async (req, res) => {
   try {
-    const { title, category, description, image, creatorName, dateOfPost } =
-      req.body;
+    const { title, description, image, creatorName, dateOfPost } = req.body;
 
-    const existingCategory = await NewsCategory.findById(category);
-    if (!existingCategory) {
+    let categories = [];
+    if (req.body.category) {
+      try {
+        categories = req.body.category
+          .replace(/[\[\]]/g, "")
+          .split(",")
+          .map((id) => id.trim());
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid category format",
+        });
+      }
+    }
+
+    if (categories.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one category is required",
+      });
+    }
+
+    const validObjectIds = categories.every((id) =>
+      mongoose.Types.ObjectId.isValid(id)
+    );
+
+    if (!validObjectIds) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid category ID format",
+      });
+    }
+
+    const categoryChecks = await Promise.all(
+      categories.map((categoryId) => NewsCategory.findById(categoryId))
+    );
+
+    const missingCategories = categoryChecks.filter((cat) => !cat);
+
+    if (missingCategories.length > 0) {
       return res.status(404).json({
         success: false,
-        message: "Category not found",
+        message: "One or more categories not found",
       });
     }
 
@@ -164,13 +204,12 @@ const createNews = async (req, res) => {
 
     const news = new News({
       title,
-      category,
+      category: categories,
       description,
-      image,
+      image: imageUrl || null,
       creatorName,
       dateOfPost: dateOfPost || new Date(),
       createdBy: req.userId,
-      image: imageUrl || null,
     });
 
     await news.save();
@@ -189,7 +228,6 @@ const createNews = async (req, res) => {
     });
   }
 };
-
 const getAllNews = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
@@ -265,25 +303,53 @@ const getNewsById = async (req, res) => {
 const updateNews = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, category, description, creatorName, dateOfPost } = req.body;
+    const { title, description, creatorName, dateOfPost } = req.body;
 
-    if (category) {
-      const existingCategory = await NewsCategory.findById(category);
-      if (!existingCategory) {
-        return res.status(404).json({
-          success: false,
-          message: "Category not found",
-        });
-      }
-    }
-
-    // Fetch the existing news item
     const existingNews = await News.findById(id);
     if (!existingNews) {
       return res.status(404).json({
         success: false,
         message: "News not found",
       });
+    }
+
+    let categories = existingNews.category;
+    if (req.body.category) {
+      try {
+        categories = req.body.category
+          .replace(/[\[\]]/g, "")
+          .split(",")
+          .map((id) => id.trim());
+
+        const validObjectIds = categories.every((id) =>
+          mongoose.Types.ObjectId.isValid(id)
+        );
+
+        if (!validObjectIds) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid category ID format",
+          });
+        }
+
+        const categoryChecks = await Promise.all(
+          categories.map((categoryId) => NewsCategory.findById(categoryId))
+        );
+
+        const missingCategories = categoryChecks.filter((cat) => !cat);
+
+        if (missingCategories.length > 0) {
+          return res.status(404).json({
+            success: false,
+            message: "One or more categories not found",
+          });
+        }
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid category format",
+        });
+      }
     }
 
     let imageUrl = existingNews.image;
@@ -306,11 +372,12 @@ const updateNews = async (req, res) => {
         imageUrl = uploadResult.secure_url;
       }
     }
+
     const updatedNews = await News.findByIdAndUpdate(
       id,
       {
         title,
-        category,
+        category: categories,
         description,
         creatorName,
         dateOfPost: dateOfPost || new Date(),

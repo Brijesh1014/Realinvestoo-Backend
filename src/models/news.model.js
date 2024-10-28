@@ -2,11 +2,13 @@ const mongoose = require("mongoose");
 
 const newsSchema = new mongoose.Schema({
   title: { type: String },
-  category: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "NewsCategory",
-    required: true,
-  },
+  category: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "NewsCategory",
+      required: true,
+    },
+  ],
   description: { type: String },
   image: { type: String },
   creatorName: { type: String },
