@@ -108,8 +108,11 @@ const getAllProperties = async (req, res) => {
     if (bestOffer) query.bestOffer = true;
     if (upcoming) query.new = true;
     if (recommended) query.recommended = true;
-    if (isFeatured) query.featured = true;
-    if (isFeatured) query.featured = false;
+    if (isFeatured === "true") {
+      query.featured = true;
+    } else if (isFeatured === "false") {
+      query.featured = false;
+    }
 
     // Time Filters
     if (timeFilter) {
