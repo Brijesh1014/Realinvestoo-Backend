@@ -31,6 +31,7 @@ const createProperty = async (req, res) => {
     const propertyDetails = new Property({
       mainPhoto: mainPhotoUrl || null,
       sliderPhotos: sliderPhotosUrl.length > 0 ? sliderPhotosUrl : null,
+      createdBy: req.userId,
       ...req.body,
     });
     const message = `Check out the latest property: ${propertyDetails.propertyName}`;
@@ -723,6 +724,36 @@ const analyticDashboard = async (req, res) => {
   }
 };
 
+const getPropertyByAgentId = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const property = await Property.find({
+      $or: [{ agent: id }, { createdBy: id }],
+    });
+    if (!property) {
+      return (
+        res.status(400),
+        json({
+          success: false,
+          message: "Property not found",
+        })
+      );
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Get properties by agent id successful",
+      data: property,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error updating appointment",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createProperty,
   getAllProperties,
@@ -739,4 +770,5 @@ module.exports = {
   updateAppointment,
   deleteAppointment,
   analyticDashboard,
+  getPropertyByAgentId,
 };

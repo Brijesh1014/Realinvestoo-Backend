@@ -95,5 +95,10 @@ router.delete(
 );
 
 router.get("/analyticDashboard", propertyController.analyticDashboard);
+router.get(
+  "/getPropertyByAgentId/:id",
+  auth(["isEmp", "isAdmin"]),
+  propertyController.getPropertyByAgentId
+);
 
 module.exports = router;
