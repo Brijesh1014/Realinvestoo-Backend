@@ -6,6 +6,7 @@ const {
   cloudinary,
 } = require("../services/cloudinary.service");
 const Favorites = require("../models/favorites.model");
+const FCMService = require("../services/notification.service");
 
 const createProperty = async (req, res) => {
   try {
@@ -32,6 +33,11 @@ const createProperty = async (req, res) => {
       sliderPhotos: sliderPhotosUrl.length > 0 ? sliderPhotosUrl : null,
       ...req.body,
     });
+    const message = `Check out the latest property: ${propertyDetails.propertyName}`;
+    await FCMService.sendNotificationToAllUsers(
+      propertyDetails.propertyName,
+      message
+    );
 
     const propertyData = await propertyDetails.save();
     return res.status(201).json({
@@ -220,7 +226,7 @@ const updateProperty = async (req, res) => {
     }
 
     if (req.file) {
-      const existingProperty = await Property.findById(req.body.id);
+      const existingProperty = await Property.findById(req.params.id);
       if (existingProperty && existingProperty.mainPhoto) {
         const existingMainPhotoPublicId = existingProperty.mainPhoto
           .split("/")
@@ -359,6 +365,7 @@ const deleteProperty = async (req, res) => {
       await cloudinary.uploader.destroy(mainPhotoPublicId);
     }
 
+    // Delete slider photos from Cloudinary
     if (property.sliderPhotos && property.sliderPhotos.length > 0) {
       const deletePromises = property.sliderPhotos.map(async (photoUrl) => {
         const publicId = photoUrl.split("/").pop().split(".")[0];
@@ -368,6 +375,10 @@ const deleteProperty = async (req, res) => {
     }
 
     await Property.findByIdAndDelete(req.params.id);
+
+    await Appointment.deleteMany({ property: req.params.id });
+
+    await Favorites.deleteMany({ property: req.params.id });
 
     return res.status(200).json({
       success: true,
@@ -694,6 +705,8 @@ const analyticDashboard = async (req, res) => {
     });
 
     res.status(200).json({
+      success: true,
+      message: "Get analytic data successful",
       soldProperties,
       topFavoriteProperties,
       recentProperties,
@@ -707,8 +720,6 @@ const analyticDashboard = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch analytics data" });
   }
 };
-
-module.exports = analyticDashboard;
 
 module.exports = {
   createProperty,

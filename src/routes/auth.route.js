@@ -35,5 +35,6 @@ router.post(
 );
 router.post("/google", authController.googleAuth);
 router.post("/googleLogin", authController.googleLogin);
+router.put("/saveFcmToken", authController.saveFcmToken);
 
 module.exports = router;

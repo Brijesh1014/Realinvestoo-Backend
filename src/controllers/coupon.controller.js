@@ -1,8 +1,20 @@
 const Coupon = require("../models/coupon.model");
+const {
+  uploadToCloudinary,
+  cloudinary,
+} = require("../services/cloudinary.service");
 
 const createCoupon = async (req, res) => {
   try {
-    let couponData = { createdBy: req.userId, ...req.body };
+    let couponUrl = null;
+    if (req.file) {
+      couponUrl = await uploadToCloudinary(req.file);
+    }
+    let couponData = {
+      createdBy: req.userId,
+      ...req.body,
+      couponImage: couponUrl,
+    };
     const coupon = new Coupon(couponData);
     await coupon.save();
     return res.status(201).json({
@@ -85,17 +97,43 @@ const getCouponById = async (req, res) => {
 
 const updateCoupon = async (req, res) => {
   try {
-    const coupon = await Coupon.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      upsert: true,
-      runValidators: true,
-    });
+    let coupon = await Coupon.findById(req.params.id);
     if (!coupon) {
       return res.status(404).json({
         success: false,
         message: "Coupon not found",
       });
     }
+    if (req.file) {
+      const existingImage = await Coupon.findById(req.params.id);
+      if (existingImage && existingImage.couponImage) {
+        const existingCouponImagePublicId = existingImage.couponImage
+          .split("/")
+          .pop()
+          .split(".")[0];
+
+        const uploadResult = await cloudinary.uploader.upload(req.file.path, {
+          public_id: existingCouponImagePublicId,
+          overwrite: true,
+        });
+
+        req.body.couponImage = uploadResult.secure_url;
+      } else {
+        const uploadResult = await uploadToCloudinary(req.file);
+        req.body.couponImage = uploadResult;
+      }
+    }
+    coupon = await Coupon.findByIdAndUpdate(
+      req.params.id,
+      {
+        ...req.body,
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
     return res.status(200).json({
       success: true,
       message: "Coupon updated successfully",

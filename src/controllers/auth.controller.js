@@ -449,6 +449,34 @@ const logout = async (req, res) => {
     });
   }
 };
+
+const saveFcmToken = async (req, res) => {
+  try {
+    const { userId, fcmToken } = req.body;
+    console.log("userId: ", userId);
+
+    const updateUserToken = await Token_Model.findOneAndUpdate(
+      { userId: userId },
+      { fcmToken: fcmToken },
+      { upsert: true }
+    );
+    if (!updateUserToken) {
+      return res.status(400).json({
+        success: false,
+        message: "Something went wrong",
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "FCM token saved successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 module.exports = {
   register,
   login,
@@ -461,4 +489,5 @@ module.exports = {
   changePassword,
   logout,
   googleAuth,
+  saveFcmToken,
 };

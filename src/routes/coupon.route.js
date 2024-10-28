@@ -2,8 +2,14 @@ const express = require("express");
 const couponController = require("../controllers/coupon.controller");
 const router = express.Router();
 const auth = require("../middlewares/auth.middleware");
+const upload = require("../services/multer.service");
 
-router.post("/createCoupon", auth(["isAdmin"]), couponController.createCoupon);
+router.post(
+  "/createCoupon",
+  upload.single("couponImage"),
+  auth(["isAdmin"]),
+  couponController.createCoupon
+);
 router.get(
   "/getAllCoupons",
   auth(["isEmp", "isAdmin", "isProuser", "isAgent"]),
@@ -16,6 +22,7 @@ router.get(
 );
 router.put(
   "/updateCoupon/:id",
+  upload.single("couponImage"),
   auth(["isAdmin"]),
   couponController.updateCoupon
 );
