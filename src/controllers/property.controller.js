@@ -512,7 +512,7 @@ const getAllAppointments = async (req, res) => {
     const totalCategoriesCount = await Appointment.countDocuments();
 
     const appointments = await Appointment.find()
-      .populate("property", "propertyName mainPhoto sliderPhotos propertyType")
+      .populate("property")
       .populate("user", "name email profileImage phoneNo")
       .populate("agent", "name email profileImage phoneNo")
       .populate("createdBy", "name email profileImage phoneNo")
