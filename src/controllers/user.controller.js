@@ -1,5 +1,8 @@
 const User_Model = require("../models/user.model");
-const { uploadToCloudinary } = require("../services/cloudinary.service");
+const {
+  uploadToCloudinary,
+  cloudinary,
+} = require("../services/cloudinary.service");
 
 const getAllAgents = async (req, res) => {
   try {
