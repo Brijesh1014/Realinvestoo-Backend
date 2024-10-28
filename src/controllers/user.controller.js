@@ -52,6 +52,7 @@ const editProfile = async (req, res) => {
       city,
       zipCode,
       reasonForJoining,
+      username,
     } = req.body;
 
     let updateData = {
@@ -63,6 +64,7 @@ const editProfile = async (req, res) => {
       city,
       zipCode,
       reasonForJoining,
+      username,
     };
 
     let profileImageUrl;
