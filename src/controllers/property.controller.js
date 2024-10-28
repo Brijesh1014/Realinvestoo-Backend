@@ -75,6 +75,7 @@ const getAllProperties = async (req, res) => {
       upcoming,
       recommended,
       timeFilter,
+      isFeatured,
       page = 1,
       limit = 10,
     } = req.query;
@@ -106,6 +107,7 @@ const getAllProperties = async (req, res) => {
     if (bestOffer) query.bestOffer = true;
     if (upcoming) query.new = true;
     if (recommended) query.recommended = true;
+    if (isFeatured) query.featured = true;
 
     // Time Filters
     if (timeFilter) {
