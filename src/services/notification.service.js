@@ -1,5 +1,6 @@
 const admin = require("firebase-admin");
-const serviceAccount = require("../config/firebase-adminsdk.json");
+require("dotenv").config();
+const serviceAccount = JSON.parse(process.env.FIREBASE_SECRET);
 const Token = require("../models/token.model");
 const User = require("../models/user.model");
 
