@@ -684,15 +684,15 @@ const deleteAppointment = async (req, res) => {
 
 const analyticDashboard = async (req, res) => {
   try {
-    const topFavoriteProperties = await Favorites.aggregate([
+    const topLikeProperties = await Likes.aggregate([
       {
         $group: {
           _id: "$propertyId",
-          favouriteCount: { $sum: 1 },
+          likeCount: { $sum: 1 },
         },
       },
       {
-        $sort: { favouriteCount: -1 },
+        $sort: { likeCount: -1 },
       },
       {
         $limit: 5,
@@ -711,7 +711,7 @@ const analyticDashboard = async (req, res) => {
       {
         $project: {
           _id: 0,
-          favouriteCount: 1,
+          likeCount: 1,
           propertyDetails: 1,
         },
       },
@@ -777,7 +777,7 @@ const analyticDashboard = async (req, res) => {
       success: true,
       message: "Get analytic data successful",
       soldProperties,
-      topFavoriteProperties,
+      topLikeProperties,
       recentProperties,
       totalProperties,
       totalCustomers,

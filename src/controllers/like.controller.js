@@ -85,9 +85,10 @@ const getUserLikedProperties = async (req, res) => {
         .json({ success: false, message: "Unauthorized access" });
     }
 
-    const userLikes = await Likes.find({ userId: req.userId }).select(
-      "propertyId"
-    );
+    const userLikes = await Likes.find({
+      userId: req.userId,
+      isLike: true,
+    }).select("propertyId");
 
     if (userLikes.length === 0) {
       return res
