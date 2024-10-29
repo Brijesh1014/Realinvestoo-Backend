@@ -1,5 +1,6 @@
 const Property = require("../models/property.model");
 const Appointment = require("../models/appointment.model");
+const Likes = require("../models/like.model");
 const User = require("../models/user.model");
 const {
   uploadToCloudinary,
@@ -154,38 +155,46 @@ const getAllProperties = async (req, res) => {
       }
     }
 
-    // Pagination
     const pageNumber = parseInt(page);
     const pageSize = parseInt(limit);
     const skip = (pageNumber - 1) * pageSize;
 
-    // Query for total properties
     const totalProperties = await Property.countDocuments(query);
-
-    // Query for sold properties
     const soldProperties = await Property.countDocuments({
       ...query,
       rentOrSale: "Sold",
     });
 
-    // Query for rent properties
     const rentProperties = await Property.countDocuments({
       ...query,
       rentOrSale: "Rent",
     });
 
-    // Query for vacant properties (visible = true and not sold)
     const vacantProperties = await Property.countDocuments({
       ...query,
       rentOrSale: { $ne: "Sold" },
       visible: true,
     });
 
-    // Fetch paginated properties
     const properties = await Property.find(query)
       .skip(skip)
       .limit(pageSize)
       .sort({ createdAt: -1 });
+
+    if (req.userId) {
+      const userLikes = await Likes.find({ userId: req.userId }).select(
+        "propertyId isLike"
+      );
+
+      const userLikesMap = {};
+      userLikes.forEach((like) => {
+        userLikesMap[like.propertyId.toString()] = like.isLike;
+      });
+
+      properties.forEach((property) => {
+        property._doc.isLike = userLikesMap[property._id.toString()] || false;
+      });
+    }
 
     const totalPages = Math.ceil(totalProperties / pageSize);
     const remainingPages =

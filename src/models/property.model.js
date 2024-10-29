@@ -41,6 +41,7 @@ const propertySchema = new mongoose.Schema(
     ratings: { type: Number, default: 0 },
     reviews: [reviewSchema],
     favourite: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "Like" }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }

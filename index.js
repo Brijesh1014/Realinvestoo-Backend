@@ -19,6 +19,7 @@ const faqRoute = require("./src/routes/faq.route");
 const contactUsRoute = require("./src/routes/contactUs.route");
 const folderRoute = require("./src/routes/folder.route");
 const fileRoute = require("./src/routes/file.route");
+const likeRoute = require("./src/routes/like.route");
 const initSocketIo = require("./src/services/socket.service");
 
 app.set("view engine", "ejs");
@@ -51,6 +52,7 @@ app.use("/faq", faqRoute);
 app.use("/contactUs", contactUsRoute);
 app.use("/file", fileRoute);
 app.use("/folder", folderRoute);
+app.use("/like", likeRoute);
 const server = app.listen(PORT, () => {
   console.log(`Server up and running on port ${PORT}!`);
 });
