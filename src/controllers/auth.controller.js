@@ -4,8 +4,8 @@ const { OAuth2Client } = require("google-auth-library");
 const bcrypt = require("bcrypt");
 const generateTokens = require("../utils/generate.token");
 const dotenv = require("dotenv");
-const { sendEmail } = require("../utils/email.utils");
 const jwt = require("jsonwebtoken");
+const sendOtp = require("../services/sendOtp.service");
 dotenv.config();
 
 const register = async (req, res) => {
@@ -315,9 +315,7 @@ const forgetPassword = async (req, res) => {
     user.otpExpiry = Date.now() + 10 * 60 * 1000;
     await user.save();
 
-    const emailText = `Your OTP for password reset is ${otp}. This OTP is valid for 10 minutes.`;
-
-    await sendEmail(email, "Password Reset OTP", emailText);
+    await sendOtp(otp, "RealInvestoo", email, "../views/sendOtp.ejs");
 
     return res
       .status(200)
@@ -401,9 +399,7 @@ const resendOtp = async (req, res) => {
     user.otpExpiry = Date.now() + 10 * 60 * 1000;
     await user.save();
 
-    const emailText = `Your new OTP for password reset is ${otp}. This OTP is valid for 10 minutes.`;
-
-    await sendEmail(email, "Resend OTP for Password Reset", emailText);
+    await sendOtp(otp, "RealInvestoo", email, "../views/resendOtp.ejs");
     return res
       .status(200)
       .json({ success: true, message: "OTP resend successfully" });

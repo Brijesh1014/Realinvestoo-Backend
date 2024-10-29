@@ -1,16 +1,4 @@
-const ejs = require("ejs");
-const { nodeMailerFunc } = require("../utils/email.utils");
-const fs = require("fs");
-const path = require("path");
-
-const sendMail = async (name, email, receiverEmail, subject, text, html) => {
-  try {
-    await nodeMailerFunc(email, receiverEmail, subject, text, html);
-    console.log(`Mail sent to ${receiverEmail}`);
-  } catch (err) {
-    console.log(`Mail error: ${err}`);
-  }
-};
+const { sendMail, renderEjsTemplate } = require("../utils/email.utils");
 
 const contactUsSendMail = async (
   name,
@@ -25,6 +13,11 @@ const contactUsSendMail = async (
   ejsPath
 ) => {
   const subject = "Contact Us";
+
+  if (!ejsPath) {
+    throw new Error("ejsPath is required");
+  }
+
   const ejsProps = {
     receiver: "",
     content,
@@ -36,17 +29,13 @@ const contactUsSendMail = async (
     messageContent: message,
   };
 
-  if (!ejsPath) {
-    throw new Error("ejsPath is required");
-  }
-  const absoluteEjsPath = path.join(__dirname, ejsPath);
-  console.log("absoluteEjsPath: ", absoluteEjsPath);
   try {
-    const ejsContent = fs.readFileSync(absoluteEjsPath, "utf8");
-    const renderedContent = ejs.render(ejsContent, ejsProps);
-    await sendMail(name, email, receiverEmail, subject, text, renderedContent);
-  } catch (err) {
-    console.log(`Error reading or rendering EJS file: ${err}`);
+    const htmlContent = renderEjsTemplate(ejsPath, ejsProps);
+
+    await sendMail(name, email, receiverEmail, subject, text, htmlContent);
+    console.log(`Contact Us email sent to ${receiverEmail}`);
+  } catch (error) {
+    console.error(`Error rendering or sending Contact Us email: ${error}`);
   }
 };
 

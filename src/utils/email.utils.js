@@ -1,5 +1,7 @@
 const nodemailer = require("nodemailer");
-
+const fs = require("fs");
+const path = require("path");
+const ejs = require("ejs");
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -8,28 +10,14 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const sendEmail = (to, subject, text, html = null) => {
-  const mailOptions = {
-    from: process.env.EMAIL_SENDER_EMAIL,
-    to,
-    subject,
-    text,
-    ...(html && { html }),
-  };
-
-  return new Promise((resolve, reject) => {
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        console.error("Error sending email:", error);
-        return reject(error);
-      } else {
-        console.log("Email sent: ", info.response);
-        return resolve(info.response);
-      }
-    });
-  });
+const sendMail = async (name, email, receiverEmail, subject, text, html) => {
+  try {
+    await nodeMailerFunc(email, receiverEmail, subject, text, html);
+    console.log(`Mail sent to ${receiverEmail}`);
+  } catch (err) {
+    console.log(`Mail error: ${err}`);
+  }
 };
-
 async function nodeMailerFunc(from, to, subject, text, html) {
   const mailOptions = {
     from,
@@ -43,7 +31,14 @@ async function nodeMailerFunc(from, to, subject, text, html) {
   return response;
 }
 
+const renderEjsTemplate = (ejsPath, ejsProps) => {
+  const absoluteEjsPath = path.join(__dirname, ejsPath);
+  const ejsContent = fs.readFileSync(absoluteEjsPath, "utf8");
+  return ejs.render(ejsContent, ejsProps);
+};
+
 module.exports = {
-  sendEmail,
+  sendMail,
   nodeMailerFunc,
+  renderEjsTemplate,
 };
