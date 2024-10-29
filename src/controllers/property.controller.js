@@ -486,7 +486,7 @@ const addReview = async (req, res) => {
 
 const createAppointment = async (req, res) => {
   try {
-    const { property, user, date, time, agent, comment } = req.body;
+    const { property, user, date, time, agent, comment, contactNo } = req.body;
 
     let propertyIsExits = await Property.findById(property);
     if (!propertyIsExits) {
@@ -519,6 +519,7 @@ const createAppointment = async (req, res) => {
       agent,
       time,
       comment,
+      contactNo,
       createdBy: req.userId,
     });
 
