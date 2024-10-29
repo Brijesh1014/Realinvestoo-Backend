@@ -81,11 +81,11 @@ const getAllProperties = async (req, res) => {
       page = 1,
       limit = 10,
       rentOrSale,
+      isLike,
     } = req.query;
 
     const query = {};
 
-    // Filters
     if (location) query.address = { $regex: location, $options: "i" };
     if (type) query.propertyType = type;
     if (minPrice || maxPrice) {
@@ -110,25 +110,19 @@ const getAllProperties = async (req, res) => {
     if (bestOffer) query.bestOffer = true;
     if (upcoming) query.new = true;
     if (recommended) query.recommended = true;
-    if (isFeatured === "true") {
-      query.featured = true;
-    } else if (isFeatured === "false") {
-      query.featured = false;
-    }
+    if (isFeatured === "true") query.featured = true;
+    else if (isFeatured === "false") query.featured = false;
 
     switch (rentOrSale) {
       case "Rent":
         query.rentOrSale = "Rent";
         break;
-
       case "Sale":
         query.rentOrSale = "Sale";
         break;
-
       case "PG":
         query.rentOrSale = "PG";
         break;
-
       default:
         break;
     }
@@ -150,8 +144,20 @@ const getAllProperties = async (req, res) => {
         default:
           break;
       }
-      if (startDate) {
-        query.createdAt = { $gte: startDate };
+      if (startDate) query.createdAt = { $gte: startDate };
+    }
+
+    if (req.userId && isLike) {
+      const userLikes = await Likes.find({
+        userId: req.userId,
+        isLike: true,
+      }).select("propertyId");
+      const likedPropertyIds = userLikes.map((like) => like.propertyId);
+
+      if (isLike === "true") {
+        query._id = { $in: likedPropertyIds };
+      } else if (isLike === "false") {
+        query._id = { $nin: likedPropertyIds };
       }
     }
 
@@ -164,12 +170,10 @@ const getAllProperties = async (req, res) => {
       ...query,
       rentOrSale: "Sold",
     });
-
     const rentProperties = await Property.countDocuments({
       ...query,
       rentOrSale: "Rent",
     });
-
     const vacantProperties = await Property.countDocuments({
       ...query,
       rentOrSale: { $ne: "Sold" },
@@ -185,7 +189,6 @@ const getAllProperties = async (req, res) => {
       const userLikes = await Likes.find({ userId: req.userId }).select(
         "propertyId isLike"
       );
-
       const userLikesMap = {};
       userLikes.forEach((like) => {
         userLikesMap[like.propertyId.toString()] = like.isLike;

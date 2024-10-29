@@ -79,11 +79,15 @@ const like = async (req, res) => {
 
 const getUserLikedProperties = async (req, res) => {
   try {
+    const { page = 1, limit = 10 } = req.query;
     if (!req.userId) {
       return res
         .status(401)
         .json({ success: false, message: "Unauthorized access" });
     }
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
 
     const userLikes = await Likes.find({
       userId: req.userId,
@@ -101,13 +105,27 @@ const getUserLikedProperties = async (req, res) => {
     const likedProperties = await Property.find({
       _id: { $in: likedPropertyIds },
     })
+      .skip(skip)
+      .limit(pageSize)
       .populate("likes")
       .sort({ createdAt: -1 });
+
+    const totalPages = Math.ceil(likedProperties / pageSize);
+    const totalLikes = likedProperties.length;
+    const remainingPages =
+      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
 
     return res.status(200).json({
       success: true,
       message: "Liked properties retrieved successfully",
       data: likedProperties,
+      meta: {
+        totalLikes,
+        currentPage: pageNumber,
+        totalPages,
+        remainingPages,
+        pageSize: likedProperties.length,
+      },
     });
   } catch (error) {
     return res.status(500).json({
