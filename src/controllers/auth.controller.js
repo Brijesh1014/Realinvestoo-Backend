@@ -25,6 +25,7 @@ const register = async (req, res) => {
       isAgent,
       isProuser,
       isEmp,
+      isUser,
     } = req.body;
 
     const existingUser = await User_Model.findOne({ email });
@@ -58,6 +59,7 @@ const register = async (req, res) => {
       isAgent,
       isProuser,
       isEmp,
+      isUser,
     });
 
     await newUser.save();
@@ -102,7 +104,8 @@ const login = async (req, res) => {
         user._id,
         user?.isAdmin,
         user?.isAgent,
-        user?.isEmp
+        user?.isEmp,
+        user?.isUser
       );
 
     await Token_Model.create({
@@ -163,6 +166,7 @@ const refreshToken = async (req, res) => {
             isAdmin: user?.isAdmin,
             isAgent: user?.isAgent,
             isEmp: user?.isEmp,
+            isUser: user?.isUser,
           },
           process.env.ACCESS_TOKEN_PRIVATE_KEY,
           { expiresIn: process.env.ACCESS_TOKEN_EXPIRY }
@@ -215,7 +219,8 @@ const googleLogin = async (req, res) => {
         user._id,
         user?.isAdmin,
         user?.isAgent,
-        user?.isEmp
+        user?.isEmp,
+        user?.isUser
       );
     return res.status(200).json({
       success: true,
@@ -265,7 +270,8 @@ const googleAuth = async (req, res) => {
         user._id,
         user?.isAdmin,
         user?.isAgent,
-        user?.isEmp
+        user?.isEmp,
+        user?.isUser
       );
       return res.status(200).json({
         success: true,

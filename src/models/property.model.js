@@ -14,7 +14,7 @@ const propertySchema = new mongoose.Schema(
     propertyName: { type: String },
     propertyType: { type: String },
     propertySize: { type: Number },
-    rentOrSale: { type: String, enum: ["Rent", "Sale", "Sold"] },
+    rentOrSale: { type: String, enum: ["Rent", "Sale", "Sold", "PG"] },
     agent: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     bedroom: { type: Number },
     bathroom: { type: Number },

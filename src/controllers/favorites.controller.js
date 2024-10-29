@@ -14,7 +14,6 @@ const createFavoritesProperty = async (req, res) => {
     }
 
     const existingFavorite = await Favorites.findOne({ propertyId, userId });
-
     if (existingFavorite) {
       return res.status(400).json({
         success: false,

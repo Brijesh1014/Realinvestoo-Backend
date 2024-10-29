@@ -90,13 +90,14 @@ const editProfile = async (req, res) => {
     }
 
     if (req.isAdmin === true) {
-      const { isAdmin, isAgent, isEmp, isProuser } = req.body;
+      const { isAdmin, isAgent, isEmp, isProuser, isUser } = req.body;
       updateData = {
         ...updateData,
         isAdmin,
         isAgent,
         isEmp,
         isProuser,
+        isUser,
       };
     }
 

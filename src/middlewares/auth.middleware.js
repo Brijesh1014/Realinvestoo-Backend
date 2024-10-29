@@ -46,6 +46,7 @@ const auth =
       req.isAdmin = decoded.isAdmin;
       req.isAgent = decoded.isAgent;
       req.isEmp = decoded.isEmp;
+      req.isUser = decoded.isUser;
 
       next();
     } catch (err) {

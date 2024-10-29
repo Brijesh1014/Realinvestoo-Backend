@@ -7,34 +7,38 @@ const auth = require("../middlewares/auth.middleware");
 
 router.post(
   "/file",
-  auth(["isEmp", "isAdmin"]),
+  auth(["isEmp", "isAdmin", "isUser"]),
   upload.fields([{ name: "file", maxCount: 10 }]),
   fileController.uploadFile
 );
 
 router.get(
   "/getFilesInFolder/:folderId",
-  auth(["isEmp", "isAdmin"]),
+  auth(["isEmp", "isAdmin", "isUser"]),
   fileController.getFilesInFolder
 );
 
 router.put(
   "/removeFile",
-  auth(["isEmp", "isAdmin"]),
+  auth(["isEmp", "isAdmin", "isUser"]),
   fileController.removeFile
 );
 
-router.put("/shareFile", auth(["isEmp", "isAdmin"]), fileController.shareFile);
+router.put(
+  "/shareFile",
+  auth(["isEmp", "isAdmin", "isUser"]),
+  fileController.shareFile
+);
 
 router.put(
   "/unshareFile",
-  auth(["isEmp", "isAdmin"]),
+  auth(["isEmp", "isAdmin", "isUser"]),
   fileController.unshareFile
 );
 
 router.delete(
   "/deleteFile/:fileId",
-  auth(["isEmp", "isAdmin"]),
+  auth(["isEmp", "isAdmin", "isUser"]),
   fileController.deleteFile
 );
 

@@ -79,6 +79,7 @@ const getAllProperties = async (req, res) => {
       isFeatured,
       page = 1,
       limit = 10,
+      rentOrSale,
     } = req.query;
 
     const query = {};
@@ -112,6 +113,23 @@ const getAllProperties = async (req, res) => {
       query.featured = true;
     } else if (isFeatured === "false") {
       query.featured = false;
+    }
+
+    switch (rentOrSale) {
+      case "Rent":
+        query.rentOrSale = "Rent";
+        break;
+
+      case "Sale":
+        query.rentOrSale = "Sale";
+        break;
+
+      case "PG":
+        query.rentOrSale = "PG";
+        break;
+
+      default:
+        break;
     }
 
     // Time Filters

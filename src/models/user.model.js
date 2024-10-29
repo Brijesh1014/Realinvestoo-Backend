@@ -51,6 +51,9 @@ const User = new Schema(
     isEmp: {
       type: Boolean,
     },
+    isUser: {
+      type: Boolean,
+    },
     resetOtp: String,
     otpExpiry: Date,
     otpVerified: {

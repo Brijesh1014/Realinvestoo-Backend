@@ -10,11 +10,11 @@ const {
 } = require("../controllers/folder.controller");
 const auth = require("../middlewares/auth.middleware");
 
-router.post("/folders", auth(["isEmp", "isAdmin"]), createFolder);
+router.post("/folders", auth(["isEmp", "isAdmin", "isUser"]), createFolder);
 
 router.post(
   "/createFolderWithUploadFile",
-  auth(["isEmp", "isAdmin"]),
+  auth(["isEmp", "isAdmin", "isUser"]),
   upload.fields([{ name: "files", maxCount: 10 }]),
   createFolderWithUploadFile
 );

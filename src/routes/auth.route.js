@@ -30,7 +30,7 @@ router.post("/resendOtp", authController.resendOtp);
 router.post("/changePassword", authController.changePassword);
 router.post(
   "/logout",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent"]),
+  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
   authController.logout
 );
 router.post("/google", authController.googleAuth);

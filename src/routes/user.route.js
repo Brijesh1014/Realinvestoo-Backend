@@ -6,18 +6,18 @@ const upload = require("../services/multer.service");
 
 router.get(
   "/getAllAgents",
-  auth(["isEmp", "isAdmin"]),
+  auth(["isEmp", "isAdmin", "isUser"]),
   userController.getAllAgents
 );
 router.put(
   "/editProfile",
   upload.single("profileImage"),
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent"]),
+  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
   userController.editProfile
 );
 router.get(
   "/getUserById/:id",
-  auth(["isEmp", "isAdmin"]),
+  auth(["isEmp", "isAdmin", "isUser"]),
   userController.getUserById
 );
 module.exports = router;

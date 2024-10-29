@@ -1,7 +1,14 @@
 const jwt = require("jsonwebtoken");
 const UserToken = require("../models/token.model");
 
-const generateTokens = async (email, userId, isAdmin, isAgent, isEmp) => {
+const generateTokens = async (
+  email,
+  userId,
+  isAdmin,
+  isAgent,
+  isEmp,
+  isUser
+) => {
   try {
     const accessTokenExpiry = process.env.ACCESS_TOKEN_EXPIRY;
     const refreshTokenExpiry = process.env.REFRESH_TOKEN_EXPIRY;
@@ -11,6 +18,7 @@ const generateTokens = async (email, userId, isAdmin, isAgent, isEmp) => {
       isAdmin: isAdmin,
       isAgent: isAgent,
       isEmp: isEmp,
+      isUser: isUser,
     };
     const accessToken = jwt.sign(
       payload,

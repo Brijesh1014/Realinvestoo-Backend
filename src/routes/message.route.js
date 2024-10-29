@@ -5,12 +5,12 @@ const auth = require("../middlewares/auth.middleware");
 
 router.get(
   "/getMessages/:chatId",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent"]),
+  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
   messageController.allMessages
 );
 router.post(
   "/sendMessage",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent"]),
+  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
   messageController.sendMessage
 );
 
