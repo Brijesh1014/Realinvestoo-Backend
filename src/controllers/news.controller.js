@@ -149,7 +149,7 @@ const deleteCategory = async (req, res) => {
 
 const createNews = async (req, res) => {
   try {
-    const { title, description, image, creatorName, dateOfPost } = req.body;
+    const { title, description, creatorName, dateOfPost } = req.body;
 
     let categories = [];
     if (req.body.category) {
@@ -199,6 +199,13 @@ const createNews = async (req, res) => {
 
     let imageUrl;
     if (req.file) {
+      if (!req.file.mimetype.startsWith("image/")) {
+        return res.status(400).json({
+          success: false,
+          message: "The uploaded file must be an image",
+        });
+      }
+
       imageUrl = await uploadToCloudinary(req.file);
     }
 
@@ -354,6 +361,13 @@ const updateNews = async (req, res) => {
 
     let imageUrl = existingNews.image;
     if (req.file) {
+      if (!req.file.mimetype.startsWith("image/")) {
+        return res.status(400).json({
+          success: false,
+          message: "The uploaded file must be an image",
+        });
+      }
+
       let existingImagePublicId;
       if (existingNews.image) {
         existingImagePublicId = existingNews.image

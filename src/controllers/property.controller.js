@@ -14,8 +14,16 @@ const createProperty = async (req, res) => {
     let mainPhotoUrl = null;
     if (req.files && req.files.mainPhoto && req.files.mainPhoto[0]) {
       const mainPhoto = req.files.mainPhoto[0];
-      mainPhotoUrl = await uploadToCloudinary(mainPhoto);
+      if (mainPhoto.mimetype.startsWith("image/")) {
+        mainPhotoUrl = await uploadToCloudinary(mainPhoto);
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Main photo must be an image",
+        });
+      }
     }
+
     let sliderPhotosUrl = [];
     if (
       req.files &&
@@ -24,8 +32,15 @@ const createProperty = async (req, res) => {
     ) {
       const sliderPhotos = req.files.sliderPhotos;
       for (const photo of sliderPhotos) {
-        const photoUrl = await uploadToCloudinary(photo);
-        sliderPhotosUrl.push(photoUrl);
+        if (photo.mimetype.startsWith("image/")) {
+          const photoUrl = await uploadToCloudinary(photo);
+          sliderPhotosUrl.push(photoUrl);
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: "All slider photos must be images",
+          });
+        }
       }
     }
 
@@ -263,6 +278,13 @@ const updateProperty = async (req, res) => {
     }
 
     if (req.file) {
+      if (!req.file.mimetype.startsWith("image/")) {
+        return res.status(400).json({
+          success: false,
+          message: "Main photo must be an image",
+        });
+      }
+
       const existingProperty = await Property.findById(req.params.id);
       if (existingProperty && existingProperty.mainPhoto) {
         const existingMainPhotoPublicId = existingProperty.mainPhoto
@@ -323,6 +345,13 @@ const uploadNewSliderPhoto = async (req, res) => {
     const sliderPhotos = req.files.sliderPhotos;
 
     for (const file of sliderPhotos) {
+      if (!file.mimetype.startsWith("image/")) {
+        return res.status(400).json({
+          success: false,
+          message: "All slider photos must be images",
+        });
+      }
+
       const uploadResponse = await cloudinary.uploader.upload(file.path);
       newImageUrls.push(uploadResponse.secure_url);
     }

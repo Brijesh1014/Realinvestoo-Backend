@@ -70,6 +70,13 @@ const editProfile = async (req, res) => {
     let profileImageUrl;
 
     if (req.file) {
+      if (!req.file.mimetype.startsWith("image/")) {
+        return res.status(400).json({
+          success: false,
+          message: "The uploaded file must be an image",
+        });
+      }
+
       const existingProfile = await User_Model.findById(req.body.id);
       if (existingProfile && existingProfile.profileImage) {
         const existingImagePublicId = existingProfile.profileImage

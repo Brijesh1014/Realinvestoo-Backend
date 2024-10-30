@@ -8,6 +8,13 @@ const createCoupon = async (req, res) => {
   try {
     let couponUrl = null;
     if (req.file) {
+      if (!req.file.mimetype.startsWith("image/")) {
+        return res.status(400).json({
+          success: false,
+          message: "The uploaded file must be an image",
+        });
+      }
+
       couponUrl = await uploadToCloudinary(req.file);
     }
     let couponData = {
@@ -105,6 +112,13 @@ const updateCoupon = async (req, res) => {
       });
     }
     if (req.file) {
+      if (!req.file.mimetype.startsWith("image/")) {
+        return res.status(400).json({
+          success: false,
+          message: "The uploaded file must be an image",
+        });
+      }
+
       const existingImage = await Coupon.findById(req.params.id);
       if (existingImage && existingImage.couponImage) {
         const existingCouponImagePublicId = existingImage.couponImage
