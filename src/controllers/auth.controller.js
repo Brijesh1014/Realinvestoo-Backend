@@ -293,7 +293,65 @@ const googleAuth = async (req, res) => {
       .json({ success: false, message: "INVALID_TOKEN", error: error.message });
   }
 };
+const appleAuth = async (req, res) => {
+  const { token } = req.body;
 
+  try {
+    const decodedToken = jwt.verify(token, process.env.APPLE_PUBLIC_KEY, {
+      algorithms: ["RS256"],
+    });
+    const { sub, email, email_verified } = decodedToken;
+
+    if (email_verified === "true") {
+      const user = await User_Model.findOneAndUpdate(
+        { email, appleId: sub },
+        {
+          appleToken: token,
+        },
+        { upsert: true, new: true }
+      );
+
+      if (user) {
+        const {
+          accessToken,
+          refreshToken,
+          accessTokenExpiry,
+          refreshTokenExpiry,
+        } = await generateTokens.generateTokens(
+          email,
+          user._id,
+          user?.isAdmin,
+          user?.isAgent,
+          user?.isEmp,
+          user?.isUser
+        );
+
+        return res.status(200).json({
+          success: true,
+          message: "Login successful",
+          data: user,
+          accessToken,
+          refreshToken,
+          accessTokenExpiry,
+          refreshTokenExpiry,
+        });
+      } else {
+        return res
+          .status(400)
+          .json({ success: false, message: "User not found or created." });
+      }
+    } else {
+      return res.status(401).json({
+        success: false,
+        message: "Apple ID email not verified.",
+      });
+    }
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, message: "INVALID_TOKEN", error: error.message });
+  }
+};
 const generateOTP = () => {
   return Math.floor(1000 + Math.random() * 9000).toString();
 };
@@ -504,4 +562,5 @@ module.exports = {
   logout,
   googleAuth,
   saveFcmToken,
+  appleAuth,
 };

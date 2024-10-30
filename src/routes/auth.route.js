@@ -34,6 +34,7 @@ router.post(
   authController.logout
 );
 router.post("/google", authController.googleAuth);
+router.post("/apple", authController.appleAuth);
 router.post("/googleLogin", authController.googleLogin);
 router.put("/saveFcmToken", authController.saveFcmToken);
 
