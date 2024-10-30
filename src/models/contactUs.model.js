@@ -21,6 +21,7 @@ const ContactUs = new Schema(
     createdBy: {
       type: String,
     },
+    contactNo: { type: Number },
     reply: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "ReplySend",

@@ -4,7 +4,7 @@ const sendReplyModel = require("../models/replySend.model");
 const createContactUs = async (req, res) => {
   try {
     const createdBy = req.userId;
-    const { name, email, subject, messageTitle, message } = req.body;
+    const { name, email, subject, messageTitle, message, contactNo } = req.body;
     if (!name || !email) {
       return res.status(400).json({
         success: false,
@@ -18,6 +18,7 @@ const createContactUs = async (req, res) => {
       messageTitle,
       message,
       createdBy,
+      contactNo,
     });
 
     await contactUsSendMail(
@@ -26,6 +27,7 @@ const createContactUs = async (req, res) => {
       messageTitle,
       message,
       email,
+      contactNo,
       (receiverEmail = "brijeshl.brainerhub@gmail.com"),
       "",
       "",
