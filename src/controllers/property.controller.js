@@ -246,12 +246,23 @@ const getAllProperties = async (req, res) => {
 const getPropertyById = async (req, res) => {
   try {
     const property = await Property.findById(req.params.id);
+
     if (!property) {
       return res.status(404).json({
         success: false,
         message: "Property not found",
       });
     }
+
+    if (req.userId) {
+      const userLike = await Likes.findOne({
+        userId: req.userId,
+        propertyId: property._id,
+      }).select("isLike");
+
+      property._doc.isLike = userLike?.isLike || false;
+    }
+
     return res.status(200).json({
       success: true,
       message: "Get property successful",
