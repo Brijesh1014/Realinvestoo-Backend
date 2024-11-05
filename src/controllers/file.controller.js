@@ -5,6 +5,7 @@ const {
 const File = require("../models/file.model");
 const User = require("../models/user.model");
 const Folder = require("../models/folder.model");
+const buildFolderPath = require("../services/buildFolderPath.service");
 
 const handleErrorResponse = (res, error, message) => {
   console.error(message, error);
@@ -17,17 +18,7 @@ const handleErrorResponse = (res, error, message) => {
 
 const uploadFile = async (req, res) => {
   try {
-    const { folderId } = req.body;
-    let sharedWith = req.body.sharedWith;
-
-    if (typeof sharedWith === "string") {
-      sharedWith = sharedWith
-        .replace(/[\[\]]/g, "")
-        .split(",")
-        .map((id) => id.trim());
-    } else if (!Array.isArray(sharedWith)) {
-      sharedWith = [sharedWith];
-    }
+    let { folderId, sharedWith } = req.body;
 
     if (!req.files || !req.files.file) {
       return res
@@ -42,11 +33,14 @@ const uploadFile = async (req, res) => {
         .json({ success: false, message: "Folder not found" });
     }
 
-    const files = req.files.file;
+    const cloudinaryFolderPath = await buildFolderPath(folderId);
 
+    const files = Array.isArray(req.files.file)
+      ? req.files.file
+      : [req.files.file];
     const uploadPromises = files.map((file) =>
       cloudinary.uploader.upload(file.path, {
-        folder: `${folder.name}`,
+        folder: cloudinaryFolderPath,
         resource_type: "auto",
       })
     );
@@ -57,11 +51,20 @@ const uploadFile = async (req, res) => {
       (uploadResult) => uploadResult.secure_url
     );
 
-    const existingUsers = await User.find({ _id: { $in: sharedWith } });
-    const existingUserIds = existingUsers.map((user) => user._id.toString());
-    const validSharedWith = sharedWith.filter((userId) =>
-      existingUserIds.includes(userId)
-    );
+    let validSharedWith = [];
+
+    if (sharedWith) {
+      sharedWith = sharedWith
+        .replace(/[\[\]]/g, "")
+        .split(",")
+        .map((id) => id.trim());
+
+      const existingUsers = await User.find({ _id: { $in: sharedWith } });
+      const existingUserIds = existingUsers.map((user) => user._id.toString());
+      validSharedWith = sharedWith.filter((userId) =>
+        existingUserIds.includes(userId)
+      );
+    }
 
     const newFile = new File({
       name: files.map((file) => file.originalname),
@@ -103,6 +106,60 @@ const getFilesInFolder = async (req, res) => {
     });
   } catch (error) {
     return handleErrorResponse(res, error, "Failed to retrieve files");
+  }
+};
+
+const getAllFiles = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    const files = await File.find({
+      $or: [{ createdBy: userId }, { sharedWith: userId }],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Get all files successful",
+      data: files,
+    });
+  } catch (error) {
+    console.error("Error retrieving files: ", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve files",
+      error: error.message,
+    });
+  }
+};
+
+const getFilesById = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    const file = await File.find({
+      _id: req.params.id,
+      $or: [{ createdBy: userId }, { sharedWith: userId }],
+    });
+
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        message: "Something went wrong",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Get file successful",
+      data: file,
+    });
+  } catch (error) {
+    console.error("Error retrieving file: ", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve file",
+      error: error.message,
+    });
   }
 };
 
@@ -205,32 +262,87 @@ const removeFile = async (req, res) => {
         .json({ message: "You do not have permission to remove this file" });
     }
 
+    const deletedPaths = [];
+    const failedDeletions = [];
+
     for (const file of filePath) {
-      const publicId = file.split("/").slice(-2).join("/").split(".")[0];
+      try {
+        const matches = file.match(/upload\/(v\d+\/)?(.+)$/);
+        if (!matches) {
+          failedDeletions.push({
+            path: file,
+            reason: "Invalid file path format",
+          });
+          continue;
+        }
 
-      await cloudinary.uploader.destroy(publicId);
+        const pathPart = matches[2];
+        const publicId = decodeURIComponent(pathPart).split(".")[0];
 
-      const index = existingFile.path.indexOf(file);
-      if (index !== -1) {
-        existingFile.path.splice(index, 1);
-        existingFile.name.splice(index, 1);
+        const result = await cloudinary.uploader.destroy(publicId);
+
+        if (result.result === "ok") {
+          deletedPaths.push(file);
+        } else {
+          failedDeletions.push({
+            path: file,
+            reason: `Cloudinary deletion failed: ${result.result}`,
+          });
+        }
+      } catch (err) {
+        failedDeletions.push({
+          path: file,
+          reason: err.message,
+        });
+        console.error(`Error deleting file: ${file}`, err);
       }
     }
+    let updatedPaths = existingFile.path;
+    let updatedNames = existingFile.name;
 
-    await existingFile.save();
+    deletedPaths.forEach((deletedPath) => {
+      const index = updatedPaths.indexOf(deletedPath);
+      if (index !== -1) {
+        updatedPaths = [
+          ...updatedPaths.slice(0, index),
+          ...updatedPaths.slice(index + 1),
+        ];
+        updatedNames = [
+          ...updatedNames.slice(0, index),
+          ...updatedNames.slice(index + 1),
+        ];
+      }
+    });
 
-    return res
-      .status(200)
-      .json({ success: true, message: "File(s) removed successfully" });
+    if (updatedPaths.length === 0) {
+      await File.deleteOne({ _id: id });
+    } else {
+      existingFile.path = updatedPaths;
+      existingFile.name = updatedNames;
+      await existingFile.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "File deletion process completed",
+      deletedFiles: {
+        successful: deletedPaths,
+        failed: failedDeletions,
+      },
+      successCount: deletedPaths.length,
+      failureCount: failedDeletions.length,
+      totalAttempted: filePath.length,
+    });
   } catch (error) {
-    console.error("Error removing file(s):", error);
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+    console.error("Error in file removal process:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 };
 
-const deleteFile = async (req, res) => {
+const deleteAllUploadedFile = async (req, res) => {
   try {
     const { fileId } = req.params;
 
@@ -241,15 +353,39 @@ const deleteFile = async (req, res) => {
         .json({ success: false, message: "File not found" });
     }
 
+    let successfulDeletions = 0;
+    let failedDeletions = [];
+
     if (file.path && file.path.length > 0) {
       const deletePromises = file.path.map(async (url) => {
-        const publicIdWithFolder = url
-          .split("/")
-          .slice(-2)
-          .join("/")
-          .split(".")[0];
+        try {
+          const matches = url.match(/upload\/(v\d+\/)?(.+)$/);
+          if (!matches) {
+            failedDeletions.push({
+              url,
+              error: "Invalid URL format",
+            });
+            return;
+          }
 
-        return cloudinary.uploader.destroy(publicIdWithFolder);
+          const publicId = decodeURIComponent(matches[2]).split(".")[0];
+
+          const result = await cloudinary.uploader.destroy(publicId);
+
+          if (result.result === "ok") {
+            successfulDeletions++;
+          } else {
+            failedDeletions.push({
+              url,
+              error: `Cloudinary deletion failed: ${result.result}`,
+            });
+          }
+        } catch (error) {
+          failedDeletions.push({
+            url,
+            error: error.message,
+          });
+        }
       });
 
       await Promise.all(deletePromises);
@@ -257,23 +393,37 @@ const deleteFile = async (req, res) => {
 
     await File.findByIdAndDelete(fileId);
 
-    return res.status(200).json({
+    const response = {
       success: true,
-      message: "File deleted successfully from Cloudinary and database",
-    });
+      message: "File deletion completed",
+      details: {
+        totalFiles: file.path ? file.path.length : 0,
+        successfulDeletions,
+        failedDeletions: failedDeletions.length,
+      },
+    };
+
+    if (failedDeletions.length > 0) {
+      response.details.failures = failedDeletions;
+    }
+
+    return res.status(200).json(response);
   } catch (error) {
     console.error("Error deleting file:", error);
-    return res
-      .status(500)
-      .json({ message: "Failed to delete file", error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete file",
+      error: error.message,
+    });
   }
 };
-
 module.exports = {
   uploadFile,
   getFilesInFolder,
   shareFile,
   unshareFile,
   removeFile,
-  deleteFile,
+  deleteAllUploadedFile,
+  getAllFiles,
+  getFilesById,
 };

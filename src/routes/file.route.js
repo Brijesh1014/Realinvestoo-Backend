@@ -37,9 +37,21 @@ router.put(
 );
 
 router.delete(
-  "/deleteFile/:fileId",
+  "/deleteAllUploadedFile/:fileId",
   auth(["isEmp", "isAdmin", "isUser"]),
-  fileController.deleteFile
+  fileController.deleteAllUploadedFile
+);
+
+router.get(
+  "/getAllFiles",
+  auth(["isEmp", "isAdmin", "isUser"]),
+  fileController.getAllFiles
+);
+
+router.get(
+  "/getFileById/:id",
+  auth(["isEmp", "isAdmin", "isUser"]),
+  fileController.getFilesById
 );
 
 module.exports = router;

@@ -7,10 +7,17 @@ const {
   getFolders,
   shareFolder,
   createFolderWithUploadFile,
+  unshareFolder,
+  deleteFolder,
+  getFolderById,
 } = require("../controllers/folder.controller");
 const auth = require("../middlewares/auth.middleware");
 
-router.post("/folders", auth(["isEmp", "isAdmin", "isUser"]), createFolder);
+router.post(
+  "/createFolder",
+  auth(["isEmp", "isAdmin", "isUser"]),
+  createFolder
+);
 
 router.post(
   "/createFolderWithUploadFile",
@@ -19,8 +26,26 @@ router.post(
   createFolderWithUploadFile
 );
 
-router.get("/folders", getFolders);
+router.get("/getAllFolders", auth(["isEmp", "isAdmin", "isUser"]), getFolders);
 
-router.post("/folders/share", shareFolder);
+router.get(
+  "/getFolderById/:id",
+  auth(["isEmp", "isAdmin", "isUser"]),
+  getFolderById
+);
+
+router.post("/shareFolder", auth(["isEmp", "isAdmin", "isUser"]), shareFolder);
+
+router.put(
+  "/unshareFolder",
+  auth(["isEmp", "isAdmin", "isUser"]),
+  unshareFolder
+);
+
+router.delete(
+  "/deleteFolder/:folderId",
+  auth(["isEmp", "isAdmin", "isUser"]),
+  deleteFolder
+);
 
 module.exports = router;

@@ -1,60 +1,54 @@
+const File = require("../models/file.model");
 const Folder = require("../models/folder.model");
 const User = require("../models/user.model");
+const buildFolderPath = require("../services/buildFolderPath.service");
 const { cloudinary } = require("../services/cloudinary.service");
-
-const handleErrorResponse = (res, error, message) => {
-  console.error(message, error);
-  return res.status(500).json({
-    success: false,
-    message,
-    error: error.message,
-  });
-};
 
 const createFolder = async (req, res) => {
   try {
-    const { name, parentId, sharedWith } = req.body;
+    let { name, parentId, sharedWith } = req.body;
+    let validSharedWith = [];
+    let parentFolder = null;
 
-    if (Array.isArray(sharedWith)) {
+    if (sharedWith) {
       const existingUsers = await User.find({ _id: { $in: sharedWith } });
       const existingUserIds = existingUsers.map((user) => user._id.toString());
-
-      const validSharedWith = sharedWith.filter((userId) =>
+      validSharedWith = sharedWith.filter((userId) =>
         existingUserIds.includes(userId)
       );
-
-      const newFolder = new Folder({
-        name,
-        parentId: parentId || null,
-        createdBy: req.userId,
-        sharedWith: validSharedWith,
-      });
-
-      const savedFolder = await newFolder.save();
-
-      const cloudinaryFolderPath = `/${name}`;
-      await cloudinary.api.create_folder(cloudinaryFolderPath, {
-        resource_type: "auto",
-      });
-
-      const shareUrl = `https://res.cloudinary.com/${
-        cloudinary.config().cloud_name
-      }/image/upload/v${cloudinaryFolderPath}`;
-
-      return res.status(201).json({
-        success: true,
-        message: "Folder created successfully",
-        data: {
-          savedFolder,
-          shareUrl,
-        },
-      });
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "sharedWith should be an array",
-      });
     }
+
+    if (parentId) {
+      parentFolder = await Folder.findById(parentId);
+      if (!parentFolder) {
+        return res.status(400).json({
+          success: false,
+          message: "Parent folder not found",
+        });
+      }
+    }
+
+    const newFolder = new Folder({
+      name,
+      parentId: parentFolder ? parentFolder._id : null,
+      createdBy: req.userId,
+      sharedWith: validSharedWith,
+    });
+    const savedFolder = await newFolder.save();
+
+    const cloudinaryFolderPath = await buildFolderPath(savedFolder._id);
+
+    await cloudinary.api.create_folder(cloudinaryFolderPath);
+
+    // const shareUrl = `https://res.cloudinary.com/${
+    //   cloudinary.config().cloud_name
+    // }/image/upload/${cloudinaryFolderPath}`;
+
+    return res.status(201).json({
+      success: true,
+      message: "Folder created successfully",
+      data: savedFolder,
+    });
   } catch (error) {
     console.error("Error creating folder: ", error);
     return res.status(500).json({
@@ -64,6 +58,8 @@ const createFolder = async (req, res) => {
     });
   }
 };
+
+module.exports = createFolder;
 
 const getFolders = async (req, res) => {
   try {
@@ -75,6 +71,7 @@ const getFolders = async (req, res) => {
 
     return res.status(200).json({
       success: true,
+      message: "Get all folders successful",
       data: folders,
     });
   } catch (error) {
@@ -102,7 +99,11 @@ const getFoldersInFolder = async (req, res) => {
       data: folders,
     });
   } catch (error) {
-    return handleErrorResponse(res, error, "Failed to retrieve folders");
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve folders",
+      error: error.message,
+    });
   }
 };
 
@@ -201,27 +202,13 @@ const deleteFolder = async (req, res) => {
       });
     }
 
-    const files = await File.find({ folderId: folderId });
-    if (files.length > 0) {
-      const deletePromises = files.map(async (file) => {
-        if (file.path && file.path.length > 0) {
-          const cloudinaryDeletePromises = file.path.map(async (url) => {
-            const publicIdWithFolder = url
-              .split("/")
-              .slice(-2)
-              .join("/")
-              .split(".")[0];
-            return cloudinary.uploader.destroy(publicIdWithFolder);
-          });
-          await Promise.all(cloudinaryDeletePromises);
-        }
-      });
+    const folderPath = `${folder.name}`;
+    await cloudinary.api.delete_resources_by_prefix(folderPath);
 
-      await Promise.all(deletePromises);
-    }
+    await cloudinary.api.delete_folder(folderPath);
 
     await File.deleteMany({ folderId: folderId });
-
+    await Folder.deleteMany({ parentId: folderId });
     await folder.deleteOne();
 
     return res.status(200).json({
@@ -288,7 +275,7 @@ const createFolderWithUploadFile = async (req, res) => {
     });
 
     const uploadedFilesUrls = await Promise.all(uploadPromises);
-    shareUrls.push(...uploadedFilesUrls); 
+    shareUrls.push(...uploadedFilesUrls);
 
     return res.status(201).json({
       success: true,
@@ -308,6 +295,37 @@ const createFolderWithUploadFile = async (req, res) => {
   }
 };
 
+const getFolderById = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    const folder = await Folder.find({
+      _id: req.params.id,
+      $or: [{ createdBy: userId }, { sharedWith: userId }],
+    });
+
+    if (!folder) {
+      return res.status(400).json({
+        success: false,
+        message: "Something went wrong",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Get folder successful",
+      data: folder,
+    });
+  } catch (error) {
+    console.error("Error retrieving folder: ", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve folder",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createFolder,
   getFolders,
@@ -316,4 +334,5 @@ module.exports = {
   unshareFolder,
   deleteFolder,
   createFolderWithUploadFile,
+  getFolderById,
 };
