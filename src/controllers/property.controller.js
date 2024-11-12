@@ -580,7 +580,7 @@ const getAllAppointments = async (req, res) => {
     const pageSize = parseInt(limit);
     const skip = (pageNumber - 1) * pageSize;
 
-    const totalCategoriesCount = await Appointment.countDocuments();
+    const totalAppointmentsCount = await Appointment.countDocuments();
 
     const appointments = await Appointment.find()
       .populate("property")
@@ -590,7 +590,7 @@ const getAllAppointments = async (req, res) => {
       .skip(skip)
       .limit(pageSize);
 
-    const totalPages = Math.ceil(totalCategoriesCount / pageSize);
+    const totalPages = Math.ceil(totalAppointmentsCount / pageSize);
     const remainingPages =
       totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
 
@@ -599,7 +599,7 @@ const getAllAppointments = async (req, res) => {
       message: "Fetched all appointments successfully",
       data: appointments,
       meta: {
-        totalCategoriesCount,
+        totalAppointmentsCount,
         currentPage: pageNumber,
         totalPages,
         remainingPages,
@@ -645,23 +645,48 @@ const getAppointmentById = async (req, res) => {
 };
 const getUserAppointments = async (req, res) => {
   try {
-    const appointment = await Appointment.find(
-      { user: req.userId } || { agent: req.userId } || { createdBy: req.userId }
-    )
+    const { page = 1, limit = 10 } = req.query;
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
+
+    const totalAppointmentsCount = await Appointment.countDocuments({
+      $or: [
+        { user: req.userId },
+        { agent: req.userId },
+        { createdBy: req.userId },
+      ],
+    });
+
+    const appointments = await Appointment.find({
+      $or: [
+        { user: req.userId },
+        { agent: req.userId },
+        { createdBy: req.userId },
+      ],
+    })
       .populate("property", "propertyName mainPhoto sliderPhotos propertyType")
       .populate("user", "name email profileImage phoneNo")
       .populate("agent", "name email profileImage phoneNo")
-      .populate("createdBy", "name email profileImage phoneNo");
-    if (!appointment) {
-      return res.status(404).json({
-        success: false,
-        message: "Something went wrong",
-      });
-    }
+      .populate("createdBy", "name email profileImage phoneNo")
+      .skip(skip)
+      .limit(pageSize);
+
+    const totalPages = Math.ceil(totalAppointmentsCount / pageSize);
+    const remainingPages =
+      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
+
     return res.status(200).json({
       success: true,
       message: "Appointment retrieved successfully",
-      data: appointment,
+      data: appointments,
+      meta: {
+        totalAppointmentsCount,
+        currentPage: pageNumber,
+        totalPages,
+        remainingPages,
+        pageSize: appointments.length,
+      },
     });
   } catch (error) {
     console.error("Error fetching appointment:", error);
@@ -672,6 +697,7 @@ const getUserAppointments = async (req, res) => {
     });
   }
 };
+
 const updateAppointment = async (req, res) => {
   try {
     const { id } = req.params;
