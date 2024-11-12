@@ -27,7 +27,11 @@ router.post("/forgetPassword", authController.forgetPassword);
 router.post("/verifyOtp", authController.verifyOtp);
 router.put("/resetPassword", authController.resetPassword);
 router.post("/resendOtp", authController.resendOtp);
-router.post("/changePassword", authController.changePassword);
+router.post(
+  "/changePassword",
+  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  authController.changePassword
+);
 router.post(
   "/logout",
   auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),

@@ -468,9 +468,10 @@ const resendOtp = async (req, res) => {
 };
 const changePassword = async (req, res) => {
   try {
-    const { email, currentPassword, newPassword } = req.body;
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.userId;
 
-    const user = await User_Model.findOne({ email });
+    const user = await User_Model.findById(userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
