@@ -1,34 +1,38 @@
+const Group = require("../models/group.model");
+const Message = require("../models/message.model");
+
 const initSocketIo = (io) => {
   io.on("connection", (socket) => {
-    console.log("Connected to socket.io");
-    socket.on("setup", (userData) => {
-      socket.join(userData._id);
-      socket.emit("connected");
+    console.log("User connected:", socket.id);
+
+    socket.on("sendMessage", async ({ senderId, receiverId, content }) => {
+      const newMessage = new Message({ senderId, receiverId, content });
+      try {
+        await newMessage.save();
+        io.emit("receiveMessage", newMessage);
+      } catch (error) {
+        console.log("Error saving message:", error);
+      }
     });
 
-    socket.on("join chat", (room) => {
-      socket.join(room);
-      console.log("User Joined Room: " + room);
-    });
-    socket.on("typing", (room) => socket.in(room).emit("typing"));
-    socket.on("stop typing", (room) => socket.in(room).emit("stop typing"));
-
-    socket.on("new message", (newMessageRecieved) => {
-      console.log("newMessageRecieved: ", newMessageRecieved);
-      var chat = newMessageRecieved.chat;
-
-      if (!chat.users) return console.log("chat.users not defined");
-
-      chat.users.forEach((user) => {
-        if (user._id == newMessageRecieved.sender._id) return;
-
-        socket.in(user._id).emit("message recieved", newMessageRecieved);
-      });
+    socket.on("sendGroupMessage", async ({ senderId, groupId, content }) => {
+      const newMessage = new Message({ senderId, groupId, content });
+      try {
+        await newMessage.save();
+        const group = await Group.findById(groupId).populate("members");
+        group.members.forEach((member) => {
+          io.to(member.userId.toString()).emit(
+            "receiveGroupMessage",
+            newMessage
+          );
+        });
+      } catch (error) {
+        console.log("Error saving group message:", error);
+      }
     });
 
-    socket.off("setup", () => {
-      console.log("USER DISCONNECTED");
-      socket.leave(userData._id);
+    socket.on("disconnect", () => {
+      console.log("User disconnected:", socket.id);
     });
   });
 };

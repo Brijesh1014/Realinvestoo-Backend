@@ -1,17 +1,17 @@
 const express = require("express");
-const messageController = require("../controllers/message.controller");
 const router = express.Router();
+const messageController = require("../controllers/message.controller");
 const auth = require("../middlewares/auth.middleware");
 
 router.get(
-  "/getMessages/:chatId",
+  "/getMessagesByReceiverId/:receiverId",
   auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
-  messageController.allMessages
+  messageController.getMessagesByReceiverId
 );
-router.post(
-  "/sendMessage",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
-  messageController.sendMessage
+router.get("/getGroupMessages/:groupId", messageController.getGroupMessages);
+router.get(
+  "/getPreviousChat/:userId1/:userId2",
+  messageController.getPreviousChat
 );
 
 module.exports = router;
