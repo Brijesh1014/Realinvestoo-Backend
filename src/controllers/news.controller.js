@@ -149,7 +149,7 @@ const deleteCategory = async (req, res) => {
 
 const createNews = async (req, res) => {
   try {
-    const { title, description, creatorName, dateOfPost } = req.body;
+    const { title, description, creatorName, dateOfPost, status } = req.body;
 
     let categories = [];
     if (req.body.category) {
@@ -217,6 +217,7 @@ const createNews = async (req, res) => {
       creatorName,
       dateOfPost: dateOfPost || new Date(),
       createdBy: req.userId,
+      status,
     });
 
     await news.save();
@@ -310,7 +311,7 @@ const getNewsById = async (req, res) => {
 const updateNews = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, creatorName, dateOfPost } = req.body;
+    const { title, description, creatorName, dateOfPost, status } = req.body;
 
     const existingNews = await News.findById(id);
     if (!existingNews) {
@@ -396,6 +397,7 @@ const updateNews = async (req, res) => {
         creatorName,
         dateOfPost: dateOfPost || new Date(),
         image: imageUrl,
+        status,
       },
       { new: true }
     );

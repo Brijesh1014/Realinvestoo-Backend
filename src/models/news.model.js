@@ -18,6 +18,7 @@ const newsSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+  status: { type: String },
 });
 const News = mongoose.model("News", newsSchema);
 
