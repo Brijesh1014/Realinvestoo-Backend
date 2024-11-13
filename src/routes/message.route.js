@@ -8,9 +8,14 @@ router.get(
   auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
   messageController.getMessagesByReceiverId
 );
-router.get("/getGroupMessages/:groupId", messageController.getGroupMessages);
+router.get(
+  "/getGroupMessages/:groupId",
+  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  messageController.getGroupMessages
+);
 router.get(
   "/getPreviousChat/:userId1/:userId2",
+  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
   messageController.getPreviousChat
 );
 

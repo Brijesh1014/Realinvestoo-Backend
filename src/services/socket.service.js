@@ -9,7 +9,11 @@ const initSocketIo = (io) => {
       const newMessage = new Message({ senderId, receiverId, content });
       try {
         await newMessage.save();
-        io.emit("receiveMessage", newMessage);
+        const populatedMessage = await Message.findById(newMessage._id)
+          .populate("senderId")
+          .populate("receiverId");
+
+        io.emit("receiveMessage", populatedMessage);
       } catch (error) {
         console.log("Error saving message:", error);
       }
@@ -19,11 +23,15 @@ const initSocketIo = (io) => {
       const newMessage = new Message({ senderId, groupId, content });
       try {
         await newMessage.save();
+        const populatedMessage = await Message.findById(
+          newMessage._id
+        ).populate("senderId");
+
         const group = await Group.findById(groupId).populate("members");
         group.members.forEach((member) => {
           io.to(member.userId.toString()).emit(
             "receiveGroupMessage",
-            newMessage
+            populatedMessage
           );
         });
       } catch (error) {
