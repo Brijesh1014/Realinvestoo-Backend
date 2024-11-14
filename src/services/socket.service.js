@@ -39,7 +39,7 @@ const initSocketIo = (io) => {
       }
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", (reason) => {
       console.log("User disconnected:", socket.id, "Reason:", reason);
     });
   });
