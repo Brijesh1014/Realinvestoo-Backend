@@ -6,7 +6,7 @@ const upload = require("../services/multer.service");
 
 router.get(
   "/getAllAgents",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
   userController.getAllAgents
 );
 router.put(
