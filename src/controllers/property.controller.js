@@ -183,9 +183,9 @@ const getAllProperties = async (req, res) => {
     const skip = (pageNumber - 1) * pageSize;
 
     const totalProperties = await Property.countDocuments(query);
-    const soldProperties = await Property.countDocuments({
+    const SaleProperties = await Property.countDocuments({
       ...query,
-      rentOrSale: "Sold",
+      rentOrSale: "Sale",
     });
     const rentProperties = await Property.countDocuments({
       ...query,
@@ -193,7 +193,7 @@ const getAllProperties = async (req, res) => {
     });
     const vacantProperties = await Property.countDocuments({
       ...query,
-      rentOrSale: { $ne: "Sold" },
+      rentOrSale: { $ne: "Sale" },
       visible: true,
     });
 
@@ -226,7 +226,7 @@ const getAllProperties = async (req, res) => {
       data: properties,
       meta: {
         totalProperties,
-        soldProperties,
+        SaleProperties,
         rentProperties,
         vacantProperties,
         currentPage: pageNumber,
@@ -789,24 +789,21 @@ const analyticDashboard = async (req, res) => {
       },
     ]);
 
-    const soldProperties = await Property.aggregate([
+    const SaleProperties = await Property.aggregate([
       {
-        $match: { rentOrSale: "Sold" },
+        $match: { rentOrSale: "Sale" },
       },
       {
         $group: {
-          _id: {
-            propertyId: "$_id",
-            month: { $month: "$updatedAt" },
-            year: { $year: "$updatedAt" },
-          },
-          propertiesSold: { $sum: 1 },
+          _id: "$_id",
+          totalSalePrice: { $sum: "$price" },
+          totalExpenses: { $sum: { $ifNull: ["$expenses", 0] } },
         },
       },
       {
         $lookup: {
           from: "properties",
-          localField: "_id.propertyId",
+          localField: "_id",
           foreignField: "_id",
           as: "propertyDetails",
         },
@@ -815,14 +812,12 @@ const analyticDashboard = async (req, res) => {
         $unwind: "$propertyDetails",
       },
       {
-        $sort: { "_id.year": 1, "_id.month": 1 },
-      },
-      {
         $project: {
           _id: 0,
-          month: "$_id.month",
-          year: "$_id.year",
-          propertiesSold: 1,
+          totalSalePrice: 1,
+          totalExpenses: 1,
+          totalRevenue: { $subtract: ["$totalSalePrice", "$totalExpenses"] },
+          totalIncome: { $add: ["$totalSalePrice"] },
           propertyDetails: 1,
         },
       },
@@ -838,24 +833,41 @@ const analyticDashboard = async (req, res) => {
       $or: [{ isEmp: true }, { isAgent: true }, { isProuser: true }],
     });
 
-    const totalSold = await Property.countDocuments({ rentOrSale: "Sold" });
+    const totalSale = await Property.countDocuments({ rentOrSale: "Sale" });
+
     const totalRent = await Property.countDocuments({ rentOrSale: "Rent" });
+
     const totalVacant = await Property.countDocuments({
-      rentOrSale: { $ne: "Sold" },
+      rentOrSale: { $ne: "Sale" },
       visible: true,
     });
+
+    const totalRevenue = SaleProperties.reduce((total, property) => {
+      return total + property.totalRevenue;
+    }, 0);
+
+    const totalIncome = SaleProperties.reduce((total, property) => {
+      return total + property.totalIncome;
+    }, 0);
+
+    const totalExpenses = SaleProperties.reduce((total, property) => {
+      return total + property.totalExpenses;
+    }, 0);
 
     res.status(200).json({
       success: true,
       message: "Get analytic data successful",
-      soldProperties,
+      SaleProperties,
       topLikeProperties,
       recentProperties,
       totalProperties,
       totalCustomers,
-      totalSold,
+      totalSale,
       totalRent,
       totalVacant,
+      totalRevenue,
+      totalIncome,
+      totalExpenses,
     });
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch analytics data" });
