@@ -2,11 +2,31 @@ const Notification = require("../models/notification.model");
 
 const getAllNotification = async (req, res) => {
   try {
-    const notifications = await Notification.find();
+    const { page = 1, limit = 10 } = req.query;
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
+    const notifications = await Notification.find()
+      .skip(skip)
+      .limit(pageSize)
+      .sort({ createdAt: -1 });
+    const totalNotification = await Notification.countDocuments();
+
+    const totalPages = Math.ceil(totalNotification / pageSize);
+    const remainingPages =
+      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
+
     return res.status(200).json({
       success: true,
       message: "Get all notifications successful",
       data: notifications,
+      meta: {
+        totalNotification,
+        currentPage: pageNumber,
+        totalPages,
+        remainingPages,
+        pageSize: notifications.length,
+      },
     });
   } catch (error) {
     console.error("Error fetching notifications:", error);
