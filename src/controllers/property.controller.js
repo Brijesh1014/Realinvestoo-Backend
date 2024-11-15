@@ -183,7 +183,7 @@ const getAllProperties = async (req, res) => {
     const skip = (pageNumber - 1) * pageSize;
 
     const totalProperties = await Property.countDocuments(query);
-    const SaleProperties = await Property.countDocuments({
+    const saleProperties = await Property.countDocuments({
       ...query,
       rentOrSale: "Sale",
     });
@@ -226,7 +226,7 @@ const getAllProperties = async (req, res) => {
       data: properties,
       meta: {
         totalProperties,
-        SaleProperties,
+        saleProperties,
         rentProperties,
         vacantProperties,
         currentPage: pageNumber,
@@ -789,7 +789,7 @@ const analyticDashboard = async (req, res) => {
       },
     ]);
 
-    const SaleProperties = await Property.aggregate([
+    const saleProperties = await Property.aggregate([
       {
         $match: { rentOrSale: "Sale" },
       },
@@ -842,22 +842,22 @@ const analyticDashboard = async (req, res) => {
       visible: true,
     });
 
-    const totalRevenue = SaleProperties.reduce((total, property) => {
+    const totalRevenue = saleProperties.reduce((total, property) => {
       return total + property.totalRevenue;
     }, 0);
 
-    const totalIncome = SaleProperties.reduce((total, property) => {
+    const totalIncome = saleProperties.reduce((total, property) => {
       return total + property.totalIncome;
     }, 0);
 
-    const totalExpenses = SaleProperties.reduce((total, property) => {
+    const totalExpenses = saleProperties.reduce((total, property) => {
       return total + property.totalExpenses;
     }, 0);
 
     res.status(200).json({
       success: true,
       message: "Get analytic data successful",
-      SaleProperties,
+      saleProperties,
       topLikeProperties,
       recentProperties,
       totalProperties,
