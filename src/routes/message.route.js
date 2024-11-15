@@ -18,5 +18,10 @@ router.get(
   auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
   messageController.getPreviousChat
 );
+router.get(
+  "/getChatPartners/:userId",
+  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  messageController.getChatPartners
+);
 
 module.exports = router;
