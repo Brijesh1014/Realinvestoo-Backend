@@ -44,6 +44,7 @@ const propertySchema = new mongoose.Schema(
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "Like" }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     expenses: { type: Number },
+    socialSource: { type: Number },
   },
   { timestamps: true }
 );

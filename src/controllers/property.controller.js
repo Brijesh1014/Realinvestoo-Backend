@@ -757,18 +757,9 @@ const deleteAppointment = async (req, res) => {
 const analyticDashboard = async (req, res) => {
   try {
     const topLikeProperties = await Likes.aggregate([
-      {
-        $group: {
-          _id: "$propertyId",
-          likeCount: { $sum: 1 },
-        },
-      },
-      {
-        $sort: { likeCount: -1 },
-      },
-      {
-        $limit: 5,
-      },
+      { $group: { _id: "$propertyId", likeCount: { $sum: 1 } } },
+      { $sort: { likeCount: -1 } },
+      { $limit: 5 },
       {
         $lookup: {
           from: "properties",
@@ -777,9 +768,7 @@ const analyticDashboard = async (req, res) => {
           as: "propertyDetails",
         },
       },
-      {
-        $unwind: "$propertyDetails",
-      },
+      { $unwind: "$propertyDetails" },
       {
         $project: {
           _id: 0,
@@ -790,9 +779,7 @@ const analyticDashboard = async (req, res) => {
     ]);
 
     const saleProperties = await Property.aggregate([
-      {
-        $match: { rentOrSale: "Sale" },
-      },
+      { $match: { rentOrSale: "Sale" } },
       {
         $group: {
           _id: "$_id",
@@ -808,9 +795,7 @@ const analyticDashboard = async (req, res) => {
           as: "propertyDetails",
         },
       },
-      {
-        $unwind: "$propertyDetails",
-      },
+      { $unwind: "$propertyDetails" },
       {
         $project: {
           _id: 0,
@@ -828,31 +813,79 @@ const analyticDashboard = async (req, res) => {
       .limit(5);
 
     const totalProperties = await Property.countDocuments();
-
     const totalCustomers = await User.countDocuments({
       $or: [{ isEmp: true }, { isAgent: true }, { isProuser: true }],
     });
-
     const totalSale = await Property.countDocuments({ rentOrSale: "Sale" });
-
     const totalRent = await Property.countDocuments({ rentOrSale: "Rent" });
-
     const totalVacant = await Property.countDocuments({
       rentOrSale: { $ne: "Sale" },
       visible: true,
     });
 
-    const totalRevenue = saleProperties.reduce((total, property) => {
-      return total + property.totalRevenue;
-    }, 0);
+    const totalRevenue = saleProperties.reduce(
+      (total, property) => total + property.totalRevenue,
+      0
+    );
+    const totalIncome = saleProperties.reduce(
+      (total, property) => total + property.totalIncome,
+      0
+    );
+    const totalExpenses = saleProperties.reduce(
+      (total, property) => total + property.totalExpenses,
+      0
+    );
 
-    const totalIncome = saleProperties.reduce((total, property) => {
-      return total + property.totalIncome;
-    }, 0);
+    const totalSocialSource = await Property.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalSocialSource: { $sum: { $ifNull: ["$socialSource", 0] } },
+        },
+      },
+    ]);
+    const socialSourceCount = totalSocialSource[0]
+      ? totalSocialSource[0].totalSocialSource
+      : 0;
 
-    const totalExpenses = saleProperties.reduce((total, property) => {
-      return total + property.totalExpenses;
-    }, 0);
+    const monthlyAnalytics = await Property.aggregate([
+      { $match: { rentOrSale: "Sale" } },
+      {
+        $group: {
+          _id: {
+            month: { $month: "$updatedAt" },
+            year: { $year: "$updatedAt" },
+          },
+          totalSalePrice: { $sum: "$price" },
+          totalExpenses: { $sum: { $ifNull: ["$expenses", 0] } },
+        },
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } },
+      {
+        $project: {
+          month: "$_id.month",
+          year: "$_id.year",
+          totalSalePrice: 1,
+          totalExpenses: 1,
+          totalRevenue: { $subtract: ["$totalSalePrice", "$totalExpenses"] },
+          totalIncome: { $add: ["$totalSalePrice"] },
+        },
+      },
+    ]);
+
+    const monthlyData = Array.from({ length: 12 }, (_, i) => {
+      const month = i + 1;
+      const monthData = monthlyAnalytics.find(
+        (data) => data.month === month
+      ) || {
+        month,
+        totalSalePrice: 0,
+        totalExpenses: 0,
+        totalRevenue: 0,
+        totalIncome: 0,
+      };
+      return monthData;
+    });
 
     res.status(200).json({
       success: true,
@@ -868,8 +901,11 @@ const analyticDashboard = async (req, res) => {
       totalRevenue,
       totalIncome,
       totalExpenses,
+      totalSocialSource: socialSourceCount,
+      monthlyData,
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: "Failed to fetch analytics data" });
   }
 };
