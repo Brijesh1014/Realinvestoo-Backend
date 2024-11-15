@@ -50,8 +50,10 @@ const createProperty = async (req, res) => {
       createdBy: req.userId,
       ...req.body,
     });
+    const senderId = req.userId;
     const message = `Check out the latest property: ${propertyDetails.propertyName}`;
     await FCMService.sendNotificationToAllUsers(
+      senderId,
       propertyDetails.propertyName,
       message
     );

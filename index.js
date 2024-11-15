@@ -20,6 +20,7 @@ const fileRoute = require("./src/routes/file.route");
 const likeRoute = require("./src/routes/like.route");
 const groupRoutes = require("./src/routes/group.route");
 const messageRoutes = require("./src/routes/message.route");
+const notificationRoute = require("./src/routes/notification.route");
 const initSocketIo = require("./src/services/socket.service");
 
 app.set("view engine", "ejs");
@@ -53,6 +54,7 @@ app.use("/folder", folderRoute);
 app.use("/like", likeRoute);
 app.use("/group", groupRoutes);
 app.use("/message", messageRoutes);
+app.use("/notification", notificationRoute);
 const server = app.listen(PORT, () => {
   console.log(`Server up and running on port ${PORT}!`);
 });

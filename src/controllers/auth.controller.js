@@ -531,7 +531,7 @@ const saveFcmToken = async (req, res) => {
     const updateUserToken = await Token_Model.findOneAndUpdate(
       { userId: userId },
       { fcmToken: fcmToken },
-      { upsert: true }
+      { new: true }
     );
     if (!updateUserToken) {
       return res.status(400).json({
