@@ -1,7 +1,6 @@
 const admin = require("firebase-admin");
 require("dotenv").config();
 const serviceAccount = JSON.parse(process.env.FIREBASE_SECRET);
-const Token = require("../models/token.model");
 const User = require("../models/user.model");
 const Notification = require("../models/notification.model");
 
@@ -56,20 +55,20 @@ const FCMService = {
 
 async function getAllUserTokens() {
   try {
-    const empUsers = await User.find({}, "_id");
-    const empUserIds = empUsers.map((user) => user._id);
+    const fcmTokens = await User.find(
+      { fcmToken: { $ne: null } },
+      "_id fcmToken"
+    ).lean();
 
-    const tokens = await Token.find(
-      { userId: { $in: empUserIds }, fcmToken: { $ne: null } },
-      "userId fcmToken"
-    );
-
-    return tokens.map((token) => ({
-      empUserId: token.userId,
+    return fcmTokens.map((token) => ({
+      empUserId: token._id,
       fcmToken: token.fcmToken,
     }));
   } catch (error) {
-    console.error("Error fetching user tokens:", error);
+    console.error("Error fetching user tokens:", {
+      message: error.message,
+      stack: error.stack,
+    });
     return [];
   }
 }

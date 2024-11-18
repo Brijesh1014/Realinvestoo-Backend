@@ -64,6 +64,9 @@ const User = new Schema(
       type: String,
     },
     googleId: { type: String },
+    fcmToken: {
+      type: String,
+    },
   },
   { timestamps: true }
 );

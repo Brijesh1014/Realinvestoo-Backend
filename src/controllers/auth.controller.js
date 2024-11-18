@@ -526,10 +526,9 @@ const logout = async (req, res) => {
 const saveFcmToken = async (req, res) => {
   try {
     const { userId, fcmToken } = req.body;
-    console.log("userId: ", userId);
 
-    const updateUserToken = await Token_Model.findOneAndUpdate(
-      { userId: userId },
+    const updateUserToken = await User_Model.findOneAndUpdate(
+      { _id: userId },
       { fcmToken: fcmToken },
       { new: true }
     );

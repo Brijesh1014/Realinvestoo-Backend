@@ -13,9 +13,6 @@ const TokenSchema = new Schema(
     refreshToken: {
       type: String,
     },
-    fcmToken: {
-      type: String,
-    },
     createdAt: {
       type: Date,
       default: Date.now,
