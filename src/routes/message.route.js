@@ -23,5 +23,15 @@ router.get(
   auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
   messageController.getChatPartners
 );
+router.put(
+  "/markMessagesAsSeen/:chatPartnerId",
+  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  messageController.markMessagesAsSeen
+);
+router.get(
+  "/getUnseenMessagesCount/:userId",
+  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  messageController.getUnseenMessagesCount
+);
 
 module.exports = router;

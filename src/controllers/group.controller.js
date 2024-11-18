@@ -231,6 +231,82 @@ const updateGroupDetails = async (req, res) => {
     });
   }
 };
+
+const getAllGroups = async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
+    const groups = await Group.find()
+      .skip(skip)
+      .limit(pageSize)
+      .sort({ createdAt: -1 });
+    const totalGroups = await Group.countDocuments();
+    const totalPages = Math.ceil(totalGroups / pageSize);
+    const remainingPages =
+      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
+    return res.status(200).json({
+      success: true,
+      data: groups,
+      meta: {
+        totalGroups,
+        currentPage: pageNumber,
+        totalPages,
+        remainingPages,
+        pageSize: groups.length,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve groups",
+      error: error.message,
+    });
+  }
+};
+const getGroupsByUser = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { page = 1, limit = 10 } = req.query;
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
+    const query = {
+      $or: [{ createdBy: userId }, { "members.userId": userId }],
+    };
+    const groups = await Group.find(query)
+      .skip(skip)
+      .limit(pageSize)
+      .sort({ createdAt: -1 });
+
+    const totalGroups = await Group.countDocuments(query);
+    const totalPages = Math.ceil(totalGroups / pageSize);
+    const remainingPages =
+      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
+
+    return res.status(200).json({
+      success: true,
+      data: groups,
+      meta: {
+        totalGroups,
+        currentPage: pageNumber,
+        totalPages,
+        remainingPages,
+        pageSize,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve groups",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createGroup,
   addMember,
@@ -238,4 +314,6 @@ module.exports = {
   promoteMember,
   deleteGroup,
   updateGroupDetails,
+  getAllGroups,
+  getGroupsByUser,
 };

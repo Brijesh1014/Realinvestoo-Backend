@@ -86,6 +86,22 @@ const getChatPartners = async (req, res) => {
               else: "$senderId",
             },
           },
+          lastMessage: { $last: "$content" },
+          lastMessageTime: { $last: "$timestamp" },
+          unseenMessages: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$receiverId", objectIdUserId] },
+                    { $eq: ["$isSeen", false] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
         },
       },
       {
@@ -104,7 +120,13 @@ const getChatPartners = async (req, res) => {
           userId: "$_id",
           "userDetails.name": 1,
           "userDetails.profileImage": 1,
+          lastMessage: 1,
+          lastMessageTime: 1,
+          unseenMessages: 1,
         },
+      },
+      {
+        $sort: { lastMessageTime: -1 },
       },
     ]);
 
@@ -114,10 +136,72 @@ const getChatPartners = async (req, res) => {
       data: chatPartners,
     });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({
+    console.error("Error retrieving chat partners:", error);
+    res.status(500).json({
       success: false,
-      message: "Could not retrieve chat partners",
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
+const markMessagesAsSeen = async (req, res) => {
+  try {
+    const { chatPartnerId } = req.params;
+    const userId = req.userId;
+
+    await Message.updateMany(
+      {
+        senderId: chatPartnerId,
+        receiverId: userId,
+        isSeen: false,
+      },
+      { isSeen: true },
+      { new: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Messages marked as seen",
+    });
+  } catch (error) {
+    console.error("Error marking messages as seen:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+const getUnseenMessagesCount = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const unseenCount = await Message.aggregate([
+      {
+        $match: {
+          receiverId: new mongoose.Types.ObjectId(userId),
+          isSeen: false,
+        },
+      },
+      {
+        $group: {
+          _id: "$senderId",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: "Unseen messages count retrieved successfully",
+      data: unseenCount,
+    });
+  } catch (error) {
+    console.error("Error retrieving unseen messages count:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
       error: error.message,
     });
   }
@@ -128,4 +212,6 @@ module.exports = {
   getGroupMessages,
   getPreviousChat,
   getChatPartners,
+  markMessagesAsSeen,
+  getUnseenMessagesCount,
 };

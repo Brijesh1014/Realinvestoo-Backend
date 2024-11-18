@@ -6,10 +6,26 @@ const messageSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
-  receiverId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  groupId: { type: mongoose.Schema.Types.ObjectId, ref: "Group" },
-  content: { type: String, required: true },
-  timestamp: { type: Date, default: Date.now },
+  receiverId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+  groupId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Group",
+  },
+  content: {
+    type: String,
+    required: true,
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now,
+  },
+  isSeen: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const Message = mongoose.model("Message", messageSchema);

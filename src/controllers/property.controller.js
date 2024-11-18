@@ -582,15 +582,53 @@ const createAppointment = async (req, res) => {
     });
 
     await newAppointment.save();
+
+    const propertyDetails = await Property.findById(property).lean();
+    const notificationTitle = "New Appointment Scheduled";
+
+    const notificationMessage = `An appointment with ${
+      req.userId === user
+        ? `Agent ${agentIsExits.name}`
+        : req.userId === agent
+        ? `User ${userIsExits.name}`
+        : "the respective person"
+    } has been scheduled for the property at ${
+      propertyDetails.address
+    } on ${date} at ${time}.`;
+
+    if (req.userId !== user && userIsExits.fcmToken) {
+      await FCMService.sendNotificationToUser(
+        req.userId,
+        userIsExits._id,
+        notificationTitle,
+        notificationMessage
+      );
+    }
+
+    if (req.userId !== agent && agentIsExits.fcmToken) {
+      await FCMService.sendNotificationToUser(
+        req.userId,
+        agentIsExits._id,
+        notificationTitle,
+        notificationMessage
+      );
+    }
+
     res.status(201).json({
       success: true,
-      message: "Scheduled appointment successful",
+      message: "Scheduled appointment successfully",
       data: newAppointment,
     });
   } catch (err) {
-    res.status(500).json({ message: "Server Error", error: err });
+    console.error("Appointment creation error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+      error: err.message,
+    });
   }
 };
+
 const getAllAppointments = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;

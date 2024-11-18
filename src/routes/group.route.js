@@ -33,5 +33,15 @@ router.delete(
   auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
   groupController.deleteGroup
 );
+router.get(
+  "/getAllGroups",
+  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  groupController.getAllGroups
+);
+router.get(
+  "/getGroupsByUser",
+  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  groupController.getGroupsByUser
+);
 
 module.exports = router;

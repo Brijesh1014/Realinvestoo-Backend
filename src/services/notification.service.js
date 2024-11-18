@@ -51,6 +51,43 @@ const FCMService = {
       console.error("Error sending notification:", error);
     }
   },
+
+  sendNotificationToUser: async (senderId, recipientId, title, message) => {
+    try {
+      const user = await User.findById(recipientId);
+
+      if (!user || !user.fcmToken) {
+        console.log(`No FCM token found for user ${recipientId}`);
+        return;
+      }
+
+      const messagePayload = {
+        notification: { title, body: message },
+      };
+
+      const response = await admin.messaging().send({
+        token: user.fcmToken,
+        ...messagePayload,
+      });
+
+      await Notification.create({
+        title,
+        message,
+        senderId,
+        recipients: [recipientId],
+        tokens: [user.fcmToken],
+        successCount: response ? 1 : 0,
+        failureCount: response ? 0 : 1,
+      });
+
+      console.log(`Notification sent to user ${recipientId}`);
+    } catch (error) {
+      console.error(
+        `Error sending notification to user ${recipientId}:`,
+        error
+      );
+    }
+  },
 };
 
 async function getAllUserTokens() {
