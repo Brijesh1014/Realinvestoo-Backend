@@ -10,41 +10,49 @@ const generateTokens = async (
   isUser
 ) => {
   try {
+    if (!email || !userId) {
+      throw new Error("Email and userId are required to generate tokens");
+    }
+
     const accessTokenExpiry = process.env.ACCESS_TOKEN_EXPIRY;
     const refreshTokenExpiry = process.env.REFRESH_TOKEN_EXPIRY;
+
     const payload = {
-      email: email,
+      email,
       id: userId,
-      isAdmin: isAdmin,
-      isAgent: isAgent,
-      isEmp: isEmp,
-      isUser: isUser,
+      isAdmin,
+      isAgent,
+      isEmp,
+      isUser,
     };
-    const accessToken = jwt.sign(
-      payload,
-      process.env.ACCESS_TOKEN_PRIVATE_KEY,
-      { expiresIn: accessTokenExpiry }
-    );
-    const refreshToken = jwt.sign(
-      payload,
-      process.env.REFRESH_TOKEN_PRIVATE_KEY,
-      { expiresIn: refreshTokenExpiry }
-    );
-    let userToken = await UserToken.findOne({ userId: userId });
-    if (userToken) await userToken.deleteOne();
-    await new UserToken({
-      userId: userId,
-      refreshToken: refreshToken,
-      accessToken: accessToken,
-    }).save();
-    return Promise.resolve({
+
+    const [accessToken, refreshToken] = [
+      jwt.sign(payload, process.env.ACCESS_TOKEN_PRIVATE_KEY, {
+        expiresIn: accessTokenExpiry,
+      }),
+      jwt.sign(payload, process.env.REFRESH_TOKEN_PRIVATE_KEY, {
+        expiresIn: refreshTokenExpiry,
+      }),
+    ];
+
+    await UserToken.deleteMany({ userId });
+
+    await UserToken.create({
+      userId,
+      refreshToken,
+      accessToken,
+      accessTokenExpiry,
+      refreshTokenExpiry,
+    });
+
+    return {
       accessToken,
       refreshToken,
       accessTokenExpiry,
       refreshTokenExpiry,
-    });
+    };
   } catch (error) {
-    return Promise.reject(error);
+    throw new Error(`Failed to generate tokens: ${error.message}`);
   }
 };
 module.exports = { generateTokens };

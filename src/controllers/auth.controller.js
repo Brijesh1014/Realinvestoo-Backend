@@ -92,8 +92,6 @@ const login = async (req, res) => {
         .json({ success: false, message: "Password Does Not Match" });
     }
 
-    await Token_Model.deleteMany({ userId: user._id });
-
     const { accessToken, refreshToken, accessTokenExpiry, refreshTokenExpiry } =
       await generateTokens.generateTokens(
         email,
@@ -103,14 +101,6 @@ const login = async (req, res) => {
         user?.isEmp,
         user?.isUser
       );
-
-    await Token_Model.create({
-      userId: user._id,
-      accessToken,
-      refreshToken,
-      accessTokenExpiry,
-      refreshTokenExpiry,
-    });
 
     return res.status(200).json({
       success: true,
