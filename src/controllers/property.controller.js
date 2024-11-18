@@ -44,6 +44,19 @@ const createProperty = async (req, res) => {
       }
     }
 
+    if (req.body.agent) {
+      const agentIsExits = await User.findOne({
+        _id: req.body.agent,
+        isAgent: true,
+      });
+      if (!agentIsExits) {
+        return res.status(400).json({
+          success: false,
+          message: "Agent not found",
+        });
+      }
+    }
+
     const propertyDetails = new Property({
       mainPhoto: mainPhotoUrl || null,
       sliderPhotos: sliderPhotosUrl.length > 0 ? sliderPhotosUrl : null,
