@@ -92,11 +92,7 @@ const login = async (req, res) => {
         .json({ success: false, message: "Password Does Not Match" });
     }
 
-    await Token_Model.findOneAndUpdate(
-      { userId: user._id },
-      { accessToken: "", refreshToken: "" },
-      { new: true }
-    );
+    await Token_Model.deleteMany({ userId: user._id });
 
     const { accessToken, refreshToken, accessTokenExpiry, refreshTokenExpiry } =
       await generateTokens.generateTokens(
