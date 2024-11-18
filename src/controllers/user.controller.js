@@ -98,14 +98,46 @@ const editProfile = async (req, res) => {
 
     if (req.isAdmin === true) {
       const { isAdmin, isAgent, isEmp, isProuser, isUser } = req.body;
-      updateData = {
-        ...updateData,
+
+      const isRoleUpdateRequested = [
         isAdmin,
         isAgent,
         isEmp,
         isProuser,
         isUser,
-      };
+      ].some((role) => role !== undefined);
+
+      if (isRoleUpdateRequested) {
+        const currentUser = await User_Model.findById(req.body.id);
+
+        let currentRole = null;
+        if (currentUser.isAdmin) currentRole = "isAdmin";
+        else if (currentUser.isAgent) currentRole = "isAgent";
+        else if (currentUser.isEmp) currentRole = "isEmp";
+        else if (currentUser.isProuser) currentRole = "isProuser";
+        else if (currentUser.isUser) currentRole = "isUser";
+
+        let newRole = null;
+        if (isAdmin) newRole = "isAdmin";
+        else if (isAgent) newRole = "isAgent";
+        else if (isEmp) newRole = "isEmp";
+        else if (isProuser) newRole = "isProuser";
+        else if (isUser) newRole = "isUser";
+        else newRole = "isUser";
+
+        if (currentRole !== newRole) {
+          if (currentRole) {
+            await User_Model.updateOne(
+              { _id: req.body.id },
+              { $unset: { [currentRole]: "" } }
+            );
+          }
+          await User_Model.updateOne(
+            { _id: req.body.id },
+            { $set: { [newRole]: true } }
+          );
+        }
+      }
     }
 
     if (profileImageUrl) {
@@ -117,7 +149,6 @@ const editProfile = async (req, res) => {
       updateData,
       {
         new: true,
-        upsert: true,
         runValidators: true,
       }
     );
