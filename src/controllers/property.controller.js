@@ -538,7 +538,10 @@ const createAppointment = async (req, res) => {
       });
     }
 
-    let userIsExits = await User.findOne({ _id: user, isEmp: true });
+    let userIsExits = await User.findOne({
+      _id: user,
+      $or: [{ isEmp: true }, { isUser: true }, { isProuser: true }],
+    });
     if (!userIsExits) {
       return res.status(400).json({
         success: false,

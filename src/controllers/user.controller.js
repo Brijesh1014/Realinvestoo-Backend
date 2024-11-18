@@ -148,7 +148,7 @@ const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (req.isAdmin === true) {
+    if (req.isAdmin) {
       const user = await User_Model.findById(id);
       if (!user) {
         return res.status(404).json({
@@ -163,32 +163,30 @@ const getUserById = async (req, res) => {
       });
     }
 
-    if (req.isEmp === true) {
-      const user = await User_Model.findOne({
-        _id: id,
-        $or: [{ isEmp: true }, { isAgent: true }],
-      });
+    const user = await User_Model.findOne({
+      _id: id,
+      $or: [
+        { isEmp: true },
+        { isUser: true },
+        { isProuser: true },
+        { isAgent: true },
+      ],
+    });
 
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: "User not found or not an employee and agent",
-        });
-      }
-
-      return res.status(200).json({
-        success: true,
-        message: "Get user successful",
-        data: user,
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found or not in allowed roles",
       });
     }
 
-    return res.status(403).json({
-      success: false,
-      message: "You are not authorized to access this user data",
+    return res.status(200).json({
+      success: true,
+      message: "Get user successful",
+      data: user,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error fetching user by ID:", error);
     return res.status(500).json({
       success: false,
       message: "Server error",
