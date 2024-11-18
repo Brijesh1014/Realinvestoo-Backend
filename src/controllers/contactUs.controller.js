@@ -51,7 +51,15 @@ const createContactUs = async (req, res) => {
 };
 const getAllContactUs = async (req, res) => {
   try {
-    const contactUs = await contactUsModel.find();
+    const { page = 1, limit = 10 } = req.query;
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
+    const contactUs = await contactUsModel
+      .find()
+      .skip(skip)
+      .limit(pageSize)
+      .sort({ createdAt: -1 });
     if (!contactUs) {
       res.status(400).json({
         success: true,
@@ -59,11 +67,22 @@ const getAllContactUs = async (req, res) => {
         contactUs,
       });
     }
+    const totalContactUs = await contactUsModel.countDocuments();
+    const totalPages = Math.ceil(totalContactUs / pageSize);
+    const remainingPages =
+      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
 
     res.status(200).json({
       success: true,
       message: "Get all contact us successfully",
       contactUs,
+      meta: {
+        totalContactUs,
+        currentPage: pageNumber,
+        totalPages,
+        remainingPages,
+        pageSize: contactUs.length,
+      },
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
