@@ -2,9 +2,10 @@ const express = require("express");
 const router = express.Router();
 const groupController = require("../controllers/group.controller");
 const auth = require("../middlewares/auth.middleware");
-
+const upload = require("../services/multer.service");
 router.post(
   "/create",
+  upload.single("image"),
   auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
   groupController.createGroup
 );
@@ -25,6 +26,7 @@ router.post(
 );
 router.put(
   "/updateGroup/:groupId",
+  upload.single("image"),
   auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
   groupController.updateGroupDetails
 );

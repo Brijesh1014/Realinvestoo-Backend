@@ -1,10 +1,64 @@
 const Group = require("../models/group.model");
-
+const { uploadToCloudinary } = require("../services/cloudinary.service");
+const User = require("../models/user.model");
+const mongoose = require("mongoose");
 const createGroup = async (req, res) => {
   try {
     const { groupName, memberIds } = req.body;
-    const members = memberIds.map((id) => ({ userId: id, role: "member" }));
-    const newGroup = new Group({ groupName, members, createdBy: req.userId });
+
+    const members = formatMemberIds(memberIds);
+    if (!members) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid member format",
+      });
+    }
+
+    if (members.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one member is required",
+      });
+    }
+
+    const invalidObjectIds = members.filter(
+      (id) => !mongoose.Types.ObjectId.isValid(id)
+    );
+    if (invalidObjectIds.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid member ID format",
+      });
+    }
+
+    const missingMembers = await checkMembersExist(members);
+    if (missingMembers.length > 0) {
+      return res.status(404).json({
+        success: false,
+        message: `One or more members not found: ${missingMembers.join(", ")}`,
+      });
+    }
+
+    let imageUrl;
+    if (req.file) {
+      const validationResult = validateImage(req.file);
+      if (validationResult.error) {
+        return res.status(400).json({
+          success: false,
+          message: validationResult.message,
+        });
+      }
+      imageUrl = await uploadToCloudinary(req.file);
+    }
+
+    const groupMembers = members.map((id) => ({ userId: id, role: "member" }));
+    const newGroup = new Group({
+      groupName,
+      members: groupMembers,
+      createdBy: req.userId,
+      groupImage: imageUrl,
+    });
+
     await newGroup.save();
 
     return res.status(201).json({
@@ -13,13 +67,39 @@ const createGroup = async (req, res) => {
       data: newGroup,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error creating group:", error);
     return res.status(500).json({
       success: false,
       message: "Could not create group",
       error: error.message,
     });
   }
+};
+
+const formatMemberIds = (memberIds) => {
+  if (!memberIds) return [];
+  try {
+    return memberIds
+      .replace(/[\[\]]/g, "")
+      .split(",")
+      .map((id) => id.trim());
+  } catch (error) {
+    return null;
+  }
+};
+
+const checkMembersExist = async (members) => {
+  const memberChecks = await Promise.all(
+    members.map((memberId) => User.findById(memberId))
+  );
+  return members.filter((_, index) => !memberChecks[index]);
+};
+
+const validateImage = (file) => {
+  if (!file.mimetype.startsWith("image/")) {
+    return { error: true, message: "The uploaded file must be an image" };
+  }
+  return { error: false };
 };
 
 const addMember = async (req, res) => {
@@ -182,25 +262,12 @@ const updateGroupDetails = async (req, res) => {
 
   try {
     const group = await Group.findById(groupId);
-
     if (!group) {
       return res.status(404).json({
         success: false,
         message: "Group not found",
       });
     }
-
-    const admin = group.members.find(
-      (member) => member.userId.equals(userId) && member.role === "admin"
-    );
-
-    if (!admin) {
-      return res.status(403).json({
-        success: false,
-        message: "Only admins can update group details",
-      });
-    }
-
     if (groupName) {
       group.groupName = groupName;
     }
@@ -216,6 +283,19 @@ const updateGroupDetails = async (req, res) => {
       });
     }
 
+    if (req.file) {
+      const validationResult = validateImage(req.file);
+      if (validationResult.error) {
+        return res.status(400).json({
+          success: false,
+          message: validationResult.message,
+        });
+      }
+
+      const imageUrl = await uploadToCloudinary(req.file);
+      group.groupImage = imageUrl;
+    }
+
     await group.save();
 
     res.status(200).json({
@@ -224,6 +304,7 @@ const updateGroupDetails = async (req, res) => {
       data: group,
     });
   } catch (error) {
+    console.error("Error updating group details:", error);
     res.status(500).json({
       success: false,
       message: "Could not update group details",

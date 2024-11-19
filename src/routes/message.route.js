@@ -9,7 +9,7 @@ router.get(
   messageController.getMessagesByReceiverId
 );
 router.get(
-  "/getGroupMessages/:groupId",
+  "/getGroupMessages",
   auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
   messageController.getGroupMessages
 );
@@ -29,7 +29,7 @@ router.put(
   messageController.markMessagesAsSeen
 );
 router.get(
-  "/getUnseenMessagesCount/:userId",
+  "/getUnseenMessagesCount",
   auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
   messageController.getUnseenMessagesCount
 );

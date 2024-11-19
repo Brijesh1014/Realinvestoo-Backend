@@ -69,7 +69,26 @@ const deleteUser = async (req, res) => {
   }
 };
 
+const fetchAllUsers = async (req, res) => {
+  try {
+    const users = await User_Model.find();
+    return res.status(200).json({
+      success: true,
+      message: "Fetch all user successful",
+      data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching Users: ", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetching Users",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
   deleteUser,
+  fetchAllUsers,
 };

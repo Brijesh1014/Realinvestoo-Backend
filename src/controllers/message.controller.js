@@ -1,3 +1,4 @@
+const Group = require("../models/group.model");
 const Message = require("../models/message.model");
 const mongoose = require("mongoose");
 const getMessagesByReceiverId = async (req, res) => {
@@ -19,22 +20,118 @@ const getMessagesByReceiverId = async (req, res) => {
     });
   }
 };
-
 const getGroupMessages = async (req, res) => {
   try {
-    const { groupId } = req.params;
-    const messages = await Message.find({ groupId }).sort({ timestamp: 1 });
+    const userId = req.userId;
+    const objectIdUserId = new mongoose.Types.ObjectId(userId);
+
+    const groupMessages = await Message.aggregate([
+      {
+        $match: {
+          groupId: { $exists: true, $ne: null },
+        },
+      },
+      {
+        $lookup: {
+          from: "groups",
+          localField: "groupId",
+          foreignField: "_id",
+          as: "groupDetails",
+        },
+      },
+      {
+        $unwind: "$groupDetails",
+      },
+      {
+        $match: {
+          "groupDetails.members.userId": objectIdUserId,
+        },
+      },
+      {
+        $group: {
+          _id: "$groupId",
+          lastMessage: { $last: "$content" },
+          lastMessageTime: { $last: "$timestamp" },
+          senderId: { $last: "$senderId" },
+          unseenMessages: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$isSeen", false] },
+                    {
+                      $in: [
+                        objectIdUserId,
+                        {
+                          $map: {
+                            input: "$groupDetails.members",
+                            as: "member",
+                            in: "$$member.userId",
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: "groups",
+          localField: "_id",
+          foreignField: "_id",
+          as: "groupDetails",
+        },
+      },
+      {
+        $unwind: "$groupDetails",
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "senderId",
+          foreignField: "_id",
+          as: "senderDetails",
+        },
+      },
+      {
+        $unwind: "$senderDetails",
+      },
+      {
+        $project: {
+          groupId: "$_id",
+          groupName: "$groupDetails.groupName",
+          groupImage: "$groupDetails.groupImage",
+          lastMessage: 1,
+          lastMessageTime: 1,
+          senderDetails: {
+            name: "$senderDetails.name",
+            sendetId: "$senderDetails._id",
+            profileImage: "$senderDetails.profileImage",
+          },
+          unseenMessages: 1,
+        },
+      },
+      {
+        $sort: { lastMessageTime: -1 },
+      },
+    ]);
 
     return res.status(200).json({
       success: true,
       message: "Group messages retrieved successfully",
-      data: messages,
+      data: groupMessages,
     });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({
+    console.error("Error retrieving group messages:", error);
+    res.status(500).json({
       success: false,
-      message: "Could not retrieve group messages",
+      message: "Server error",
       error: error.message,
     });
   }
@@ -147,18 +244,28 @@ const getChatPartners = async (req, res) => {
 
 const markMessagesAsSeen = async (req, res) => {
   try {
-    const { chatPartnerId } = req.params;
+    const { chatPartnerId, groupId } = req.params;
     const userId = req.userId;
 
-    await Message.updateMany(
-      {
-        senderId: chatPartnerId,
-        receiverId: userId,
-        isSeen: false,
-      },
-      { isSeen: true },
-      { new: true }
-    );
+    if (chatPartnerId) {
+      await Message.updateMany(
+        {
+          senderId: chatPartnerId,
+          receiverId: userId,
+          isSeen: false,
+        },
+        { $set: { isSeen: true } }
+      );
+    } else if (groupId) {
+      await Message.updateMany(
+        {
+          groupId,
+          isSeen: false,
+          senderId: { $ne: userId },
+        },
+        { $set: { isSeen: true } }
+      );
+    }
 
     res.status(200).json({
       success: true,
@@ -175,9 +282,9 @@ const markMessagesAsSeen = async (req, res) => {
 };
 const getUnseenMessagesCount = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = req.userId;
 
-    const unseenCount = await Message.aggregate([
+    const unseenDirect = await Message.aggregate([
       {
         $match: {
           receiverId: new mongoose.Types.ObjectId(userId),
@@ -192,10 +299,29 @@ const getUnseenMessagesCount = async (req, res) => {
       },
     ]);
 
+    const unseenGroup = await Message.aggregate([
+      {
+        $match: {
+          groupId: { $exists: true },
+          isSeen: false,
+          senderId: { $ne: new mongoose.Types.ObjectId(userId) },
+        },
+      },
+      {
+        $group: {
+          _id: "$groupId",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
     res.status(200).json({
       success: true,
       message: "Unseen messages count retrieved successfully",
-      data: unseenCount,
+      data: {
+        unseenDirect,
+        unseenGroup,
+      },
     });
   } catch (error) {
     console.error("Error retrieving unseen messages count:", error);
