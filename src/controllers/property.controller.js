@@ -311,25 +311,22 @@ const updateProperty = async (req, res) => {
         });
       }
 
-      const existingProperty = await Property.findById(req.params.id);
-      if (existingProperty && existingProperty.mainPhoto) {
-        const existingMainPhotoPublicId = existingProperty.mainPhoto
-          .split("/")
-          .pop()
-          .split(".")[0];
+      const existingMainPhotoPublicId = property.mainPhoto
+        ?.split("/")
+        .pop()
+        .split(".")[0];
 
+      if (existingMainPhotoPublicId) {
         const uploadResult = await cloudinary.uploader.upload(req.file.path, {
           public_id: existingMainPhotoPublicId,
           overwrite: true,
         });
-
         req.body.mainPhoto = uploadResult.secure_url;
       } else {
         const uploadResult = await uploadToCloudinary(req.file);
         req.body.mainPhoto = uploadResult;
       }
     }
-
     property = await Property.findByIdAndUpdate(
       req.params.id,
       {
@@ -339,6 +336,14 @@ const updateProperty = async (req, res) => {
         new: true,
         runValidators: true,
       }
+    );
+
+    const senderId = req.userId;
+    const message = `The property "${property.propertyName}" has been updated. Check out the latest details!`;
+    await FCMService.sendNotificationToAllUsers(
+      senderId,
+      property.propertyName,
+      message
     );
 
     return res.status(200).json({
