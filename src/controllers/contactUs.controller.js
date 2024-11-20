@@ -153,6 +153,7 @@ const sendReply = async (req, res) => {
       "",
       sendReply,
       (email = inquiry.email),
+      "",
       (receiverEmail = inquiry.email),
       "",
       "",
