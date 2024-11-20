@@ -27,6 +27,7 @@ const appointmentSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    alertType: { type: String },
   },
   { timestamps: true }
 );

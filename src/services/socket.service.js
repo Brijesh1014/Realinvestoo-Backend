@@ -162,7 +162,8 @@ const initSocketIo = (io) => {
 
     socket.on("getChatPartners", async (userId) => {
       try {
-        const objectIdUserId = new mongoose.Types.ObjectId(userId);
+        const userIdString = userId?.userId || userId;
+        const objectIdUserId = new mongoose.Types.ObjectId(userIdString);
 
         const chatPartners = await Message.aggregate([
           {
