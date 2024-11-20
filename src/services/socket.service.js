@@ -6,6 +6,7 @@ const initSocketIo = (io) => {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
+    // Send direct message
     socket.on("sendMessage", async ({ senderId, receiverId, content }) => {
       const newMessage = new Message({ senderId, receiverId, content });
       try {
@@ -20,6 +21,7 @@ const initSocketIo = (io) => {
       }
     });
 
+    // Send group message
     socket.on("sendGroupMessage", async ({ senderId, groupId, content }) => {
       const newMessage = new Message({ senderId, groupId, content });
       try {
@@ -33,6 +35,8 @@ const initSocketIo = (io) => {
         console.log("Error saving group message:", error);
       }
     });
+
+    // Mark messages as seen
     socket.on(
       "markMessagesAsSeen",
       async ({ userId, chatPartnerId, groupId }) => {
@@ -74,6 +78,7 @@ const initSocketIo = (io) => {
       }
     );
 
+    // Retrieve unseen messages count
     socket.on("getUnseenMessagesCount", async (userId) => {
       try {
         const userIdString = userId?.userId || userId;
@@ -130,6 +135,113 @@ const initSocketIo = (io) => {
       }
     });
 
+    // Retrieve previous chat
+    socket.on("getPreviousChat", async ({ userId1, userId2 }) => {
+      try {
+        const messages = await Message.find({
+          $or: [
+            { senderId: userId1, receiverId: userId2 },
+            { senderId: userId2, receiverId: userId1 },
+          ],
+        }).sort({ timestamp: 1 });
+
+        socket.emit("previousChat", {
+          success: true,
+          message: "Previous chat retrieved successfully",
+          data: messages,
+        });
+      } catch (error) {
+        console.error("Error retrieving previous chat:", error);
+        socket.emit("previousChatError", {
+          success: false,
+          message: "Could not retrieve previous chat",
+          error: error.message,
+        });
+      }
+    });
+
+    socket.on("getChatPartners", async (userId) => {
+      try {
+        const objectIdUserId = new mongoose.Types.ObjectId(userId);
+
+        const chatPartners = await Message.aggregate([
+          {
+            $match: {
+              $or: [
+                { senderId: objectIdUserId },
+                { receiverId: objectIdUserId },
+              ],
+            },
+          },
+          {
+            $group: {
+              _id: {
+                $cond: {
+                  if: { $eq: ["$senderId", objectIdUserId] },
+                  then: "$receiverId",
+                  else: "$senderId",
+                },
+              },
+              lastMessage: { $last: "$content" },
+              lastMessageTime: { $last: "$timestamp" },
+              unseenMessages: {
+                $sum: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $eq: ["$receiverId", objectIdUserId] },
+                        { $eq: ["$isSeen", false] },
+                      ],
+                    },
+                    1,
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+          {
+            $lookup: {
+              from: "users", // Assuming your user collection is named "users"
+              localField: "_id",
+              foreignField: "_id",
+              as: "userDetails",
+            },
+          },
+          {
+            $unwind: "$userDetails",
+          },
+          {
+            $project: {
+              userId: "$_id",
+              "userDetails.name": 1,
+              "userDetails.profileImage": 1,
+              lastMessage: 1,
+              lastMessageTime: 1,
+              unseenMessages: 1,
+            },
+          },
+          {
+            $sort: { lastMessageTime: -1 },
+          },
+        ]);
+
+        socket.emit("chatPartners", {
+          success: true,
+          message: "Chat partners retrieved successfully",
+          data: chatPartners,
+        });
+      } catch (error) {
+        console.error("Error retrieving chat partners:", error);
+        socket.emit("chatPartnersError", {
+          success: false,
+          message: "Server error",
+          error: error.message,
+        });
+      }
+    });
+
+    // Handle user disconnect
     socket.on("disconnect", (reason) => {
       console.log("User disconnected:", socket.id, "Reason:", reason);
     });

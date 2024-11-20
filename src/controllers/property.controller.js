@@ -570,6 +570,21 @@ const createAppointment = async (req, res) => {
       });
     }
 
+    const conflictingAppointment = await Appointment.findOne({
+      property,
+      agent,
+      date,
+      time,
+    });
+
+    if (conflictingAppointment) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "An appointment already exists with the same property, agent, date, and time.",
+      });
+    }
+
     const newAppointment = new Appointment({
       property,
       user,
@@ -585,7 +600,6 @@ const createAppointment = async (req, res) => {
 
     const propertyDetails = await Property.findById(property).lean();
     const notificationTitle = "New Appointment Scheduled";
-
     const notificationMessage = `An appointment with ${
       req.userId === user
         ? `Agent ${agentIsExits.name}`
@@ -757,24 +771,92 @@ const getUserAppointments = async (req, res) => {
 const updateAppointment = async (req, res) => {
   try {
     const { id } = req.params;
-    const updateAppointment = await Appointment.findByIdAndUpdate(
-      id,
-      req.body,
-      { new: true }
-    );
-    if (!updateAppointment) {
+    const updatedData = req.body;
+
+    const existingAppointment = await Appointment.findById(id);
+    if (!existingAppointment) {
       return res.status(404).json({
         success: false,
         message: "Appointment not found",
       });
     }
 
+    const updatedFields = {};
+    if (
+      updatedData.date &&
+      updatedData.date !== existingAppointment.date.toISOString().split("T")[0]
+    ) {
+      updatedFields.date = updatedData.date;
+    }
+    if (updatedData.time && updatedData.time !== existingAppointment.time) {
+      updatedFields.time = updatedData.time;
+    }
+    if (
+      updatedData.status &&
+      updatedData.status !== existingAppointment.status
+    ) {
+      updatedFields.status = updatedData.status;
+    }
+
+    const updatedAppointment = await Appointment.findByIdAndUpdate(
+      id,
+      updatedData,
+      { new: true }
+    ).populate("property user agent");
+
+    if (!updatedAppointment) {
+      return res.status(404).json({
+        success: false,
+        message: "Failed to update appointment",
+      });
+    }
+
+    const notificationTitle = "Appointment Updated";
+    let notificationMessage = `The appointment for the property at ${
+      updatedAppointment.property?.address || "unknown address"
+    } has been updated.`;
+
+    if (updatedFields.date || updatedFields.time) {
+      notificationMessage += ` The new schedule is on ${
+        updatedFields.date || updatedAppointment.date
+      } at ${updatedFields.time || updatedAppointment.time}.`;
+    }
+
+    if (updatedFields.status) {
+      notificationMessage += ` The status is now "${updatedFields.status}".`;
+    }
+
+    if (
+      req.userId !== updatedAppointment.user._id.toString() &&
+      updatedAppointment.user.fcmToken
+    ) {
+      await FCMService.sendNotificationToUser(
+        req.userId,
+        updatedAppointment.user._id,
+        notificationTitle,
+        notificationMessage
+      );
+    }
+
+    if (
+      req.userId !== updatedAppointment.agent._id.toString() &&
+      updatedAppointment.agent.fcmToken
+    ) {
+      await FCMService.sendNotificationToUser(
+        req.userId,
+        updatedAppointment.agent._id,
+        notificationTitle,
+        notificationMessage
+      );
+    }
+
     return res.status(200).json({
       success: true,
       message: "Appointment updated successfully",
-      data: updateAppointment,
+      data: updatedAppointment,
     });
   } catch (error) {
+    console.error("Error updating appointment:", error);
     return res.status(500).json({
       success: false,
       message: "Error updating appointment",
@@ -782,6 +864,7 @@ const updateAppointment = async (req, res) => {
     });
   }
 };
+
 const deleteAppointment = async (req, res) => {
   try {
     const { id } = req.params;
