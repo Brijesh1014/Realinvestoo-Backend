@@ -295,11 +295,19 @@ const getPropertyById = async (req, res) => {
 
 const updateProperty = async (req, res) => {
   try {
+    const userId = req.userId;
     let property = await Property.findById(req.params.id);
     if (!property) {
       return res.status(404).json({
         success: false,
         message: "Property not found",
+      });
+    }
+    
+    if (property.createdBy != userId) {
+      return res.status(400).json({
+        success: false,
+        message: "You do not have permission to update the appointment.",
       });
     }
 
@@ -778,13 +786,21 @@ const getUserAppointments = async (req, res) => {
 const updateAppointment = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.userId;
     const updatedData = req.body;
 
     const existingAppointment = await Appointment.findById(id);
+
     if (!existingAppointment) {
       return res.status(404).json({
         success: false,
         message: "Appointment not found",
+      });
+    }
+    if (existingAppointment.createdBy != userId) {
+      return res.status(400).json({
+        success: false,
+        message: "You do not have permission to update the appointment.",
       });
     }
 
@@ -863,7 +879,6 @@ const updateAppointment = async (req, res) => {
       data: updatedAppointment,
     });
   } catch (error) {
-    console.error("Error updating appointment:", error);
     return res.status(500).json({
       success: false,
       message: "Error updating appointment",
