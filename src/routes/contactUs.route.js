@@ -1,10 +1,42 @@
 const express = require("express");
 const router = express.Router();
 const contactUsController = require("../controllers/contactUs.controller");
+const auth = require("../middlewares/auth.middleware");
 
-router.post("/create", contactUsController.createContactUs);
-router.get("/getAllContactUs", contactUsController.getAllContactUs);
-router.get("/getContactUsById/:id", contactUsController.getContactUsById);
-router.delete("/deleteContactUs/:id", contactUsController.deleteContactUs);
-router.post("/sendReply", contactUsController.sendReply);
+router.post(
+  "/create",
+  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  contactUsController.createContactUs
+);
+router.get(
+  "/getAllContactUs",
+  auth(["isAdmin"]),
+  contactUsController.getAllContactUs
+);
+router.get(
+  "/getContactUsById/:id",
+  auth(["isAdmin"]),
+  contactUsController.getContactUsById
+);
+router.delete(
+  "/deleteContactUs/:id",
+  auth(["isAdmin"]),
+  contactUsController.deleteContactUs
+);
+router.post("/sendReply", auth(["isAdmin"]), contactUsController.sendReply);
+router.get(
+  "/getInquiriesWithoutReply",
+  auth(["isAdmin"]),
+  contactUsController.getInquiriesWithoutReply
+);
+router.get(
+  "/getSentReplyById/:id",
+  auth(["isAdmin"]),
+  contactUsController.getSentReplyById
+);
+router.get(
+  "/getAllSentReplies",
+  auth(["isAdmin"]),
+  contactUsController.getAllSentReplies
+);
 module.exports = router;

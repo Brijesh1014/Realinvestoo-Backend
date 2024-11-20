@@ -41,6 +41,7 @@ const createContactUs = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Contact US sent successfully",
+      data: newContactUs,
     });
   } catch (err) {
     res.status(500).json({
@@ -176,10 +177,131 @@ const sendReply = async (req, res) => {
   }
 };
 
+const getInquiriesWithoutReply = async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
+
+    const inquiriesWithoutReply = await contactUsModel
+      .find({ reply: { $exists: false } })
+      .skip(skip)
+      .limit(pageSize)
+      .sort({ createdAt: -1 });
+
+    if (!inquiriesWithoutReply || inquiriesWithoutReply.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No inquiries without replies found",
+      });
+    }
+
+    const totalInquiries = await contactUsModel.countDocuments({
+      reply: { $exists: false },
+    });
+    const totalPages = Math.ceil(totalInquiries / pageSize);
+    const remainingPages =
+      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
+
+    res.status(200).json({
+      success: true,
+      message: "Inquiries without replies retrieved successfully",
+      inquiries: inquiriesWithoutReply,
+      meta: {
+        totalInquiries,
+        currentPage: pageNumber,
+        totalPages,
+        remainingPages,
+        pageSize: inquiriesWithoutReply.length,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+const getSentReplyById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const sentReply = await sendReplyModel
+      .findById(id)
+      .populate("inquiryId", "name email subject message");
+
+    if (!sentReply) {
+      return res.status(404).json({
+        success: false,
+        message: "Sent reply not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Sent reply retrieved successfully",
+      sentReply,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+const getAllSentReplies = async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
+
+    const sentReplies = await sendReplyModel
+      .find()
+      .populate("inquiryId", "name email subject message")
+      .skip(skip)
+      .limit(pageSize)
+      .sort({ createdAt: -1 });
+
+    if (!sentReplies || sentReplies.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No sent replies found",
+      });
+    }
+
+    const totalReplies = await sendReplyModel.countDocuments();
+    const totalPages = Math.ceil(totalReplies / pageSize);
+    const remainingPages =
+      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
+
+    res.status(200).json({
+      success: true,
+      message: "Sent replies retrieved successfully",
+      sentReplies,
+      meta: {
+        totalReplies,
+        currentPage: pageNumber,
+        totalPages,
+        remainingPages,
+        pageSize: sentReplies.length,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 module.exports = {
   createContactUs,
   getAllContactUs,
   deleteContactUs,
   getContactUsById,
   sendReply,
+  getAllSentReplies,
+  getSentReplyById,
+  getInquiriesWithoutReply,
 };
