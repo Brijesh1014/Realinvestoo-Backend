@@ -135,30 +135,34 @@ const initSocketIo = (io) => {
       }
     });
 
-    // Retrieve previous chat
-    socket.on("getPreviousChat", async ({ userId1, userId2 }) => {
-      try {
-        const messages = await Message.find({
-          $or: [
-            { senderId: userId1, receiverId: userId2 },
-            { senderId: userId2, receiverId: userId1 },
-          ],
-        }).sort({ timestamp: 1 });
+    socket.on(
+      "getPreviousChat",
+      async ({ userId1, userId2, skip = 0, limit = 1 }) => {
+        try {
+          const messages = await Message.find({
+            $or: [
+              { senderId: userId1, receiverId: userId2 },
+              { senderId: userId2, receiverId: userId1 },
+            ],
+          })
+            .sort({ timestamp: -1 })
+            .skip(skip)
+            .limit(limit);
 
-        socket.emit("previousChat", {
-          success: true,
-          message: "Previous chat retrieved successfully",
-          data: messages,
-        });
-      } catch (error) {
-        console.error("Error retrieving previous chat:", error);
-        socket.emit("previousChatError", {
-          success: false,
-          message: "Could not retrieve previous chat",
-          error: error.message,
-        });
+          socket.emit("previousChat", {
+            success: true,
+            data: messages.reverse(),
+          });
+        } catch (error) {
+          console.error("Error fetching previous chat:", error);
+          socket.emit("previousChatError", {
+            success: false,
+            message: "Could not retrieve previous chat",
+            error: error.message,
+          });
+        }
       }
-    });
+    );
 
     socket.on("getChatPartners", async (userId) => {
       try {
