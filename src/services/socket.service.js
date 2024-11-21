@@ -1,6 +1,7 @@
 const Group = require("../models/group.model");
 const Message = require("../models/message.model");
 const mongoose = require("mongoose");
+const User = require("../models/user.model");
 
 const initSocketIo = (io) => {
   io.on("connection", (socket) => {
@@ -242,6 +243,30 @@ const initSocketIo = (io) => {
       }
     });
 
+    socket.on("getAllGroups", async (userId) => {
+      try {
+        const user = await User.findById(userId.userId);
+        if (!user.isAdmin) {
+          return socket.emit("error", {
+            success: false,
+            message: "Only admin can view all groups",
+          });
+        }
+        const groups = await Group.find().sort({ createdAt: -1 });
+        socket.emit("allGroups", {
+          success: true,
+          message: "Groups retrieved successfully",
+          data: groups,
+        });
+      } catch (error) {
+        console.error("Error retrieving groups:", error);
+        socket.emit("allGroupsError", {
+          success: false,
+          message: "Server error",
+          error: error.message,
+        });
+      }
+    });
     // Handle user disconnect
     socket.on("disconnect", (reason) => {
       console.log("User disconnected:", socket.id, "Reason:", reason);

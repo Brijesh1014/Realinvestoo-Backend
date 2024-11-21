@@ -38,7 +38,6 @@ const createGroup = async (req, res) => {
         message: `One or more members not found: ${missingMembers.join(", ")}`,
       });
     }
-
     let imageUrl;
     if (req.file) {
       const validationResult = validateImage(req.file);
@@ -51,7 +50,11 @@ const createGroup = async (req, res) => {
       imageUrl = await uploadToCloudinary(req.file);
     }
 
-    const groupMembers = members.map((id) => ({ userId: id, role: "member" }));
+    const groupMembers = [
+      { userId: req.userId, role: "admin" },
+      ...members.map((id) => ({ userId: id, role: "member" })), 
+    ];
+
     const newGroup = new Group({
       groupName,
       members: groupMembers,
@@ -176,12 +179,13 @@ const promoteMember = async (req, res) => {
   try {
     const { groupId } = req.params;
     const { adminId, memberIdToPromote } = req.body;
+    const userId = req.userId;
     const group = await Group.findById(groupId);
     const admin = group.members.find(
       (member) => member.userId.equals(adminId) && member.role === "admin"
     );
 
-    if (!admin) {
+    if (!admin && group.createdBy != userId) {
       return res.status(403).json({
         success: false,
         message: "Only admins can promote members",
@@ -233,7 +237,7 @@ const deleteGroup = async (req, res) => {
       (member) => member.userId.equals(userId) && member.role === "admin"
     );
 
-    if (!admin) {
+    if (!admin && group.createdBy != userId) {
       return res.status(403).json({
         success: false,
         message: "Only admins can delete the group",
