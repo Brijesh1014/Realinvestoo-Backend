@@ -94,7 +94,7 @@ router.delete(
   propertyController.deleteAppointment
 );
 
-router.get("/analyticDashboard", propertyController.analyticDashboard);
+router.get("/analyticDashboard", auth(["isAdmin"]), propertyController.analyticDashboard);
 router.get(
   "/getPropertyByAgentId/:id",
   auth(["isEmp", "isAdmin", "isUser", "isAgent"]),
