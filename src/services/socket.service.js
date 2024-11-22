@@ -253,10 +253,21 @@ const initSocketIo = (io) => {
           });
         }
         const groups = await Group.find().sort({ createdAt: -1 });
+        const groupsWithLastMessage = await Promise.all(groups.map(async (group) => {
+          const lastMessage = await Message.findOne({ groupId: group._id })
+            .sort({ createdAt: -1 })
+            .limit(1); 
+    
+          return {
+            ...group.toObject(),
+            lastMessage: lastMessage ? lastMessage.content : null, 
+          };
+        }));
+    
         socket.emit("allGroups", {
           success: true,
           message: "Groups retrieved successfully",
-          data: groups,
+          data: groupsWithLastMessage,
         });
       } catch (error) {
         console.error("Error retrieving groups:", error);
