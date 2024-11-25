@@ -89,7 +89,7 @@ const getUserLikedProperties = async (req, res) => {
       });
     }
 
-    const userLikes = await Likes.find({ userId, isLike: true }).select("propertyId");
+    const userLikes = await Likes.find({ userId, isLike: true }).select("propertyId isLike");
 
     if (userLikes.length === 0) {
       return res.status(200).json({
@@ -108,6 +108,11 @@ const getUserLikedProperties = async (req, res) => {
 
     const likedPropertyIds = userLikes.map((like) => like.propertyId);
 
+    const userLikesMap = {};
+    userLikes.forEach((like) => {
+      userLikesMap[like.propertyId.toString()] = like.isLike;
+    });
+
     const pageNumber = parseInt(page);
     const pageSize = parseInt(limit);
     const skip = (pageNumber - 1) * pageSize;
@@ -116,6 +121,11 @@ const getUserLikedProperties = async (req, res) => {
       .skip(skip)
       .limit(pageSize)
       .sort({ createdAt: -1 });
+
+    properties.forEach((property) => {
+      console.log(`Checking property: ${property._id} isLiked: ${userLikesMap[property._id.toString()]}`);
+      property._doc.isLike = userLikesMap[property._id.toString()] || false;
+    });
 
     const totalProperties = properties.length; 
     const totalPages = Math.ceil(likedPropertyIds.length / pageSize); 
