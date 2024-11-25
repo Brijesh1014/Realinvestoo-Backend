@@ -425,7 +425,7 @@ const initSocketIo = (io) => {
         socket.emit("groupMessages", {
           success: true,
           message: "Messages for the group retrieved successfully",
-          data: groupMessages.reverse(),
+          data: groupMessages
         });
     
       } catch (error) {
