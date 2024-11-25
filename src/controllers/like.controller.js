@@ -123,7 +123,6 @@ const getUserLikedProperties = async (req, res) => {
       .sort({ createdAt: -1 });
 
     properties.forEach((property) => {
-      console.log(`Checking property: ${property._id} isLiked: ${userLikesMap[property._id.toString()]}`);
       property._doc.isLike = userLikesMap[property._id.toString()] || false;
     });
 
