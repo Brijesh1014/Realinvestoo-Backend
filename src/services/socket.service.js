@@ -278,6 +278,79 @@ const initSocketIo = (io) => {
         });
       }
     });
+
+    socket.on("getGroupMessages", async (userId) => {
+      try {
+        const objectIdUserId = new mongoose.Types.ObjectId(userId.userId);
+
+        const groupMessages = await Message.aggregate([
+          {
+            $match: {
+              groupId: { $exists: true, $ne: null },
+            },
+          },
+          {
+            $lookup: {
+              from: "groups",
+              localField: "groupId",
+              foreignField: "_id",
+              as: "groupDetails",
+            },
+          },
+          {
+            $unwind: "$groupDetails",
+          },
+          {
+            $match: {
+              "groupDetails.members.userId": objectIdUserId,
+            },
+          },
+          {
+            $lookup: {
+              from: "users",
+              localField: "senderId",
+              foreignField: "_id",
+              as: "senderDetails",
+            },
+          },
+          {
+            $unwind: "$senderDetails",
+          },
+          {
+            $project: {
+              groupId: "$groupId",
+              groupName: "$groupDetails.groupName",
+              groupImage: "$groupDetails.groupImage",
+              messageId: "$_id",
+              content: "$content",
+              timestamp: "$timestamp",
+              isSeen: "$isSeen",
+              senderDetails: {
+                name: "$senderDetails.name",
+                senderId: "$senderDetails._id",
+                profileImage: "$senderDetails.profileImage",
+              },
+            },
+          },
+          {
+            $sort: { timestamp: 1 },
+          },
+        ]);
+
+        socket.emit("groupMessages", {
+          success: true,
+          message: "All group messages retrieved successfully",
+          data: groupMessages.reverse(),
+        });
+      } catch (error) {
+        console.error("Error retrieving group messages:", error);
+        socket.emit("groupMessagesError", {
+          success: false,
+          message: "Server error",
+          error: error.message,
+        });
+      }
+    });
     // Handle user disconnect
     socket.on("disconnect", (reason) => {
       console.log("User disconnected:", socket.id, "Reason:", reason);

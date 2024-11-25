@@ -26,11 +26,13 @@ const getGroupMessages = async (req, res) => {
     const objectIdUserId = new mongoose.Types.ObjectId(userId);
 
     const groupMessages = await Message.aggregate([
+      // Match messages associated with groups
       {
         $match: {
           groupId: { $exists: true, $ne: null },
         },
       },
+      // Lookup group details for each message
       {
         $lookup: {
           from: "groups",
@@ -42,55 +44,13 @@ const getGroupMessages = async (req, res) => {
       {
         $unwind: "$groupDetails",
       },
+      // Match groups where the current user is a member
       {
         $match: {
           "groupDetails.members.userId": objectIdUserId,
         },
       },
-      {
-        $group: {
-          _id: "$groupId",
-          lastMessage: { $last: "$content" },
-          lastMessageTime: { $last: "$timestamp" },
-          senderId: { $last: "$senderId" },
-          unseenMessages: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $eq: ["$isSeen", false] },
-                    {
-                      $in: [
-                        objectIdUserId,
-                        {
-                          $map: {
-                            input: "$groupDetails.members",
-                            as: "member",
-                            in: "$$member.userId",
-                          },
-                        },
-                      ],
-                    },
-                  ],
-                },
-                1,
-                0,
-              ],
-            },
-          },
-        },
-      },
-      {
-        $lookup: {
-          from: "groups",
-          localField: "_id",
-          foreignField: "_id",
-          as: "groupDetails",
-        },
-      },
-      {
-        $unwind: "$groupDetails",
-      },
+      // Lookup sender details for each message
       {
         $lookup: {
           from: "users",
@@ -102,30 +62,32 @@ const getGroupMessages = async (req, res) => {
       {
         $unwind: "$senderDetails",
       },
+      // Project the relevant fields
       {
         $project: {
-          groupId: "$_id",
+          groupId: "$groupId",
           groupName: "$groupDetails.groupName",
           groupImage: "$groupDetails.groupImage",
-          lastMessage: 1,
-          lastMessageTime: 1,
+          messageId: "$_id",
+          content: "$content",
+          timestamp: "$timestamp",
+          isSeen: "$isSeen",
           senderDetails: {
             name: "$senderDetails.name",
-            sendetId: "$senderDetails._id",
+            senderId: "$senderDetails._id",
             profileImage: "$senderDetails.profileImage",
           },
-          unseenMessages: 1,
         },
       },
       {
-        $sort: { lastMessageTime: -1 },
+        $sort: { timestamp: 1 },
       },
     ]);
 
     return res.status(200).json({
       success: true,
-      message: "Group messages retrieved successfully",
-      data: groupMessages,
+      message: "All group messages retrieved successfully",
+      data: groupMessages.reverse(),
     });
   } catch (error) {
     console.error("Error retrieving group messages:", error);
@@ -136,6 +98,8 @@ const getGroupMessages = async (req, res) => {
     });
   }
 };
+
+
 
 const getPreviousChat = async (req, res) => {
   try {
