@@ -279,7 +279,8 @@ const initSocketIo = (io) => {
       }
     });
 
-    socket.on("getGroupMessages", async (userId) => {
+    socket.on("getAllGroupMessages", async (userId) => {
+
       try {
         const objectIdUserId = new mongoose.Types.ObjectId(userId.userId);
 
@@ -337,7 +338,7 @@ const initSocketIo = (io) => {
           },
         ]);
 
-        socket.emit("groupMessages", {
+        socket.emit("allGroupsMessages", {
           success: true,
           message: "All group messages retrieved successfully",
           data: groupMessages.reverse(),
@@ -351,6 +352,93 @@ const initSocketIo = (io) => {
         });
       }
     });
+
+    
+    socket.on("getGroupMessages", async ({ userId, groupId }) => {
+      try {
+        const objectIdUserId = new mongoose.Types.ObjectId(userId);
+        const objectIdGroupId = new mongoose.Types.ObjectId(groupId);
+    
+        const group = await Group.findOne({
+          _id: objectIdGroupId,
+          "members.userId": objectIdUserId,
+        });
+        
+        if (!group) {
+          socket.emit("groupMessages", {
+            success: false,
+            message: "You are not a member of this group or there are no messages.",
+            data: [],
+          });
+          return;
+        }
+    
+        const groupMessages = await Message.aggregate([
+          {
+            $match: {
+              groupId: objectIdGroupId,
+            },
+          },
+          {
+            $lookup: {
+              from: "groups",
+              localField: "groupId",
+              foreignField: "_id",
+              as: "groupDetails",
+            },
+          },
+          {
+            $unwind: "$groupDetails",
+          },
+          {
+            $lookup: {
+              from: "users",
+              localField: "senderId",
+              foreignField: "_id",
+              as: "senderDetails",
+            },
+          },
+          {
+            $unwind: "$senderDetails",
+          },
+          {
+            $project: {
+              groupId: "$groupId",
+              groupName: "$groupDetails.groupName",
+              groupImage: "$groupDetails.groupImage",
+              messageId: "$_id",
+              content: "$content",
+              timestamp: "$timestamp",
+              isSeen: "$isSeen",
+              senderDetails: {
+                name: "$senderDetails.name",
+                senderId: "$senderDetails._id",
+                profileImage: "$senderDetails.profileImage",
+              },
+            },
+          },
+          {
+            $sort: { timestamp: 1 },
+          },
+        ]);
+    
+        socket.emit("groupMessages", {
+          success: true,
+          message: "Messages for the group retrieved successfully",
+          data: groupMessages.reverse(),
+        });
+    
+      } catch (error) {
+        console.error("Error retrieving group messages:", error);
+        socket.emit("groupMessagesError", {
+          success: false,
+          message: "Server error",
+          error: error.message,
+        });
+      }
+    });
+    
+
     // Handle user disconnect
     socket.on("disconnect", (reason) => {
       console.log("User disconnected:", socket.id, "Reason:", reason);
