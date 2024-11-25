@@ -80,57 +80,64 @@ const like = async (req, res) => {
 const getUserLikedProperties = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
-    if (!req.userId) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Unauthorized access" });
-    }
-    const pageNumber = parseInt(page);
-    const pageSize = parseInt(limit);
-    const skip = (pageNumber - 1) * pageSize;
+    const userId = req.userId;
 
-    const userLikes = await Likes.find({
-      userId: req.userId,
-      isLike: true,
-    }).select("propertyId");
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "User is not authenticated",
+      });
+    }
+
+    const userLikes = await Likes.find({ userId, isLike: true }).select("propertyId");
 
     if (userLikes.length === 0) {
-      return res
-        .status(404)
-        .json({ success: false, message: "No liked properties found" });
+      return res.status(200).json({
+        success: true,
+        message: "User has no liked properties",
+        data: [],
+        meta: {
+          totalProperties: 0,
+          currentPage: page,
+          totalPages: 0,
+          remainingPages: 0,
+          pageSize: 0,
+        },
+      });
     }
 
     const likedPropertyIds = userLikes.map((like) => like.propertyId);
 
-    const likedProperties = await Property.find({
-      _id: { $in: likedPropertyIds },
-    })
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
+
+    const properties = await Property.find({ _id: { $in: likedPropertyIds } })
       .skip(skip)
       .limit(pageSize)
-      .populate("likes")
       .sort({ createdAt: -1 });
 
-    const totalPages = Math.ceil(likedProperties / pageSize);
-    const totalLikes = likedProperties.length;
-    const remainingPages =
-      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
+    const totalProperties = properties.length; 
+    const totalPages = Math.ceil(likedPropertyIds.length / pageSize); 
+    const remainingPages = totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
 
     return res.status(200).json({
       success: true,
-      message: "Liked properties retrieved successfully",
-      data: likedProperties,
+      message: "User liked properties fetched successfully",
+      data: properties,
       meta: {
-        totalLikes,
+        totalProperties, 
         currentPage: pageNumber,
         totalPages,
         remainingPages,
-        pageSize: likedProperties.length,
+        pageSize: properties.length, 
       },
     });
   } catch (error) {
+    console.error(error);
     return res.status(500).json({
       success: false,
-      message: "Failed to retrieve liked properties",
+      message: "Failed to retrieve user's liked properties",
       error: error.message,
     });
   }
