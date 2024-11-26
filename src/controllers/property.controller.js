@@ -484,6 +484,7 @@ const deleteProperty = async (req, res) => {
     await Appointment.deleteMany({ property: req.params.id });
 
     await Favorites.deleteMany({ property: req.params.id });
+    await Likes.deleteMany({ propertyId: req.params.id });
 
     return res.status(200).json({
       success: true,
