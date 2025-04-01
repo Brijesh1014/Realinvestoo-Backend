@@ -45,13 +45,10 @@ const User = new Schema(
     isAgent: {
       type: Boolean,
     },
-    isProuser: {
+    isBuyer: {
       type: Boolean,
     },
-    isEmp: {
-      type: Boolean,
-    },
-    isUser: {
+    isSeller: {
       type: Boolean,
     },
     resetOtp: String,

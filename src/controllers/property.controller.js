@@ -568,7 +568,7 @@ const createAppointment = async (req, res) => {
 
     let userIsExits = await User.findOne({
       _id: user,
-      $or: [{ isEmp: true }, { isUser: true }, { isProuser: true }],
+      $or: [{ isSeller: true }, { isBuyer: true }],
     });
     if (!userIsExits) {
       return res.status(400).json({
@@ -974,7 +974,7 @@ const analyticDashboard = async (req, res) => {
 
     const totalProperties = await Property.countDocuments();
     const totalCustomers = await User.countDocuments({
-      $or: [{ isEmp: true }, { isAgent: true }, { isProuser: true }],
+      $or: [{ isSeller: true }, { isAgent: true }, { isBuyer: true }],
     });
     const totalSale = await Property.countDocuments({ rentOrSale: "Sale" });
     const totalRent = await Property.countDocuments({ rentOrSale: "Rent" });

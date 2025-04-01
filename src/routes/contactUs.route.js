@@ -5,7 +5,7 @@ const auth = require("../middlewares/auth.middleware");
 
 router.post(
   "/create",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   contactUsController.createContactUs
 );
 router.get(

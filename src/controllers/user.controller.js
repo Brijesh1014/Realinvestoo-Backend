@@ -44,6 +44,7 @@ const getAllAgents = async (req, res) => {
 const editProfile = async (req, res) => {
   try {
     const {
+      id, // The user ID being updated
       name,
       phoneNo,
       gender,
@@ -53,7 +54,18 @@ const editProfile = async (req, res) => {
       zipCode,
       reasonForJoining,
       username,
+      isAdmin,
+      isAgent,
+      isBuyer,
+      isSeller
     } = req.body;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
 
     let updateData = {
       name,
@@ -77,8 +89,15 @@ const editProfile = async (req, res) => {
         });
       }
 
-      const existingProfile = await User_Model.findById(req.body.id);
-      if (existingProfile && existingProfile.profileImage) {
+      const existingProfile = await User_Model.findById(id);
+      if (!existingProfile) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      if (existingProfile.profileImage) {
         const existingImagePublicId = existingProfile.profileImage
           .split("/")
           .pop()
@@ -94,66 +113,56 @@ const editProfile = async (req, res) => {
         const uploadResult = await uploadToCloudinary(req.file);
         profileImageUrl = uploadResult;
       }
-    }
 
-    if (req.isAdmin === true) {
-      const { isAdmin, isAgent, isEmp, isProuser, isUser } = req.body;
-
-      const isRoleUpdateRequested = [
-        isAdmin,
-        isAgent,
-        isEmp,
-        isProuser,
-        isUser,
-      ].some((role) => role !== undefined);
-
-      if (isRoleUpdateRequested) {
-        const currentUser = await User_Model.findById(req.body.id);
-
-        let currentRole = null;
-        if (currentUser.isAdmin) currentRole = "isAdmin";
-        else if (currentUser.isAgent) currentRole = "isAgent";
-        else if (currentUser.isEmp) currentRole = "isEmp";
-        else if (currentUser.isProuser) currentRole = "isProuser";
-        else if (currentUser.isUser) currentRole = "isUser";
-
-        let newRole = null;
-        if (isAdmin) newRole = "isAdmin";
-        else if (isAgent) newRole = "isAgent";
-        else if (isEmp) newRole = "isEmp";
-        else if (isProuser) newRole = "isProuser";
-        else if (isUser) newRole = "isUser";
-        else newRole = "isUser";
-
-        if (currentRole !== newRole) {
-          if (currentRole) {
-            await User_Model.updateOne(
-              { _id: req.body.id },
-              { $unset: { [currentRole]: "" } }
-            );
-          }
-          await User_Model.updateOne(
-            { _id: req.body.id },
-            { $set: { [newRole]: true } }
-          );
-        }
-      }
-    }
-
-    if (profileImageUrl) {
       updateData.profileImage = profileImageUrl;
     }
 
-    const profile = await User_Model.findByIdAndUpdate(
-      req.body.id,
-      updateData,
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+    if (req.isAdmin === true) {
+      console.log("comes");
+      
+      const roles = {
+        isAdmin: isAdmin === 'true' || isAdmin === true,
+        isAgent: isAgent === 'true' || isAgent === true,
+        isBuyer: isBuyer === 'true' || isBuyer === true,
+        isSeller: isSeller === 'true' || isSeller === true,
+      };
+      
+      const providedRoles = Object.entries(roles)
+        .filter(([_, value]) => Boolean(value) === true); 
+      
 
-    if (!profile) {
+      if (providedRoles.length > 1) {
+        return res.status(400).json({
+          success: false,
+          message: "Only one role can be set to 'true' at a time.",
+        });
+      }
+
+      if (providedRoles.length === 1) {
+        const [role] = providedRoles[0];
+
+        const userToUpdate = await User_Model.findById(id);
+        if (!userToUpdate) {
+          return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        updateData = {
+          ...updateData,
+          isAdmin: false,
+          isAgent: false,
+          isBuyer: false,
+          isSeller: false,
+          [role]: true,
+        };
+      }
+    }
+
+    const updatedProfile = await User_Model.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!updatedProfile) {
       return res.status(404).json({
         success: false,
         message: "Profile not found",
@@ -163,8 +172,9 @@ const editProfile = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Profile updated successfully",
-      data: profile,
+      data: updatedProfile,
     });
+
   } catch (error) {
     console.error("Error updating profile:", error);
     return res.status(500).json({
@@ -174,6 +184,10 @@ const editProfile = async (req, res) => {
     });
   }
 };
+
+
+
+
 
 const getUserById = async (req, res) => {
   try {
@@ -197,9 +211,8 @@ const getUserById = async (req, res) => {
     const user = await User_Model.findOne({
       _id: id,
       $or: [
-        { isEmp: true },
-        { isUser: true },
-        { isProuser: true },
+        { isSeller: true },
+        { isBuyer: true },
         { isAgent: true },
       ],
     });

@@ -297,6 +297,349 @@ const getUnseenMessagesCount = async (req, res) => {
   }
 };
 
+
+const deleteSingleMessage = async(req,res)=>{
+  try {
+    const {id}=req.params
+    const userId = req.userId
+    let singleMessage = await Message.findById(id)
+    if(userId !== singleMessage.senderId){
+      return res.status(400).json({
+        success:false,
+        message:"Do not allow"
+      })
+    }
+    singleMessage.deleteOne()
+
+    return res.status(200).json({
+      success:true,
+      message:"Single message deleted successful "
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+}
+
+
+const deletePreviousChat = async (req, res) => {
+  try {
+    const { userId1, userId2 } = req.params;
+
+    const messages = await Message.deleteMany({
+      $or: [
+        { senderId: userId1, receiverId: userId2 },
+        { senderId: userId2, receiverId: userId1 },
+      ],
+    });
+
+
+    return res.status(200).json({
+      success: true,
+      message: "Deleted previous chat successfully",
+      data: messages,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+const softDeletedPreviousChat = async (req, res) => {
+  try {
+    const { userId1, userId2 } = req.params;
+    const userId = req.userId; 
+    
+    if (userId !== userId1 && userId !== userId2) {
+      return res.status(400).json({
+        success: false,
+        message: "You are not authorized to delete this chat",
+      });
+    }
+
+    const messages = await Message.find({
+      $or: [
+        { senderId: userId1, receiverId: userId2 },
+        { senderId: userId2, receiverId: userId1 },
+      ],
+    });
+
+    if (messages.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No messages found between these users",
+      });
+    }
+
+const updatedMessages = await Message.updateMany(
+  {
+    $or: [
+      { senderId: userId1, receiverId: userId2 },
+      { senderId: userId2, receiverId: userId1 },
+    ],
+  },
+  {
+    $push: {
+      softDelete: {
+        isDeleted: true,
+        userId: new mongoose.Types.ObjectId(userId),
+      },
+    },
+  },
+  {
+    returnDocument: 'after', 
+  }
+);
+
+
+    return res.status(200).json({
+      success: true,
+      message: "Previous chat marked as deleted successfully",
+      data: updatedMessages,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+const softDeleteSingleChat = async(req,res)=>{
+  try {
+    const {id}=req.params
+
+    const userId = new mongoose.Types.ObjectId(req.userId)
+    console.log('userId: ', userId);
+    
+
+    let singleMessage = await Message.findById(id);
+    console.log('singleMessage: ', singleMessage);
+
+    if (!singleMessage) {
+      return res.status(404).json({
+        success: false,
+        message: "Message not found",
+      });
+    }
+    
+    const isAlreadyDeleted = singleMessage?.softDelete.some(
+      (entry) => entry?.userId?.equals(userId)
+   
+    );
+    
+    if (isAlreadyDeleted) {
+      return res.status(403).json({
+        success: false,
+        message: "Already deleted",
+      });
+    }
+
+    if (
+      !singleMessage.senderId.equals(userId) &&
+      !singleMessage.receiverId.equals(userId)
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to delete this chat",
+      });
+    }
+  
+    singleMessage.softDelete.push({
+      isDeleted: true,
+      userId: new mongoose.Types.ObjectId(userId),
+    });
+    await singleMessage.save();
+    
+    return res.status(200).json({
+      success: true,
+      message: "Message soft-deleted successfully",
+      data: singleMessage,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+}
+
+const deleteGroupMessages = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = new mongoose.Types.ObjectId(req.userId);
+
+    const groupData = await Group.findById(groupId);
+    if (!groupData) {
+      return res.status(404).json({
+        success: false,
+        message: "Group not found",
+      });
+    }
+
+    const isAdmin = groupData.members.some(
+      (member) => member.userId.equals(userId) && member.role === "admin"
+    );
+    if (!isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "Only admins can delete group messages",
+      });
+    }
+
+    const deleteResult = await Message.deleteMany({ groupId });
+    if (deleteResult.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No messages found to delete",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `${deleteResult.deletedCount} messages deleted successfully`,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+const softDeleteGroupMessages = async(req,res)=>{
+  try {
+    const { groupId } = req.params;
+    const userId = new mongoose.Types.ObjectId(req.userId);
+
+    const groupMessages = await Message.find({ groupId });
+    if (!groupMessages || groupMessages.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Group messages not found",
+      });
+    }
+
+    const groupData = await Group.findById(groupId);
+    console.log('groupData: ', groupData);
+    if (!groupData) {
+      return res.status(404).json({
+        success: false,
+        message: "Group not found",
+      });
+    }
+
+    const isMember = groupData.members.some(
+      (member) => member.userId.equals(userId) && member.role === "admin" || member.role === "member"
+    );
+
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: "Only admins can delete group messages",
+      });
+    }
+
+    const updatedMessages = [];
+    for (const message of groupMessages) {
+      const alreadyDeleted = message.softDelete.some((entry) =>
+        entry.userId.equals(userId)
+      );
+
+      if (alreadyDeleted) {
+        continue; 
+      }
+
+      message.softDelete.push({
+        isDeleted: true,
+        userId,
+      });
+      updatedMessages.push(message.save());
+    }
+
+    await Promise.all(updatedMessages);
+
+    return res.status(200).json({
+      success: true,
+      message: "Messages soft-deleted successfully"
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+}
+
+const softDeleteSingleGroupMessage = async(req,res)=>{
+  try {
+    const {messageId,groupId} = req.params
+    const userId = new mongoose.Types.ObjectId(req.userId)
+    
+    let singleGroupMessage = await Message.findById(messageId);
+
+    if (!singleGroupMessage) {
+      return res.status(404).json({
+        success: false,
+        message: "Message not found",
+      });
+    }
+
+    
+    const groupData = await Group.findById(groupId);
+    if (!groupData) {
+      return res.status(404).json({
+        success: false,
+        message: "Group not found",
+      });
+    }
+
+    const isMember = groupData.members.some(
+      (member) => member.userId.equals(userId) && member.role === "admin" || "member"
+    );
+    
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: "Only member can delete messages",
+      });
+    }
+
+      
+    singleGroupMessage.softDelete.push({
+      isDeleted: true,
+      userId: new mongoose.Types.ObjectId(userId),
+    });
+    await singleGroupMessage.save();
+    return res.status(200).json({
+      success: true,
+      message: "Group message soft-deleted successfully",
+      data: singleGroupMessage,
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+}
+
+
+
+
+
 module.exports = {
   getMessagesByReceiverId,
   getGroupMessages,
@@ -304,4 +647,11 @@ module.exports = {
   getChatPartners,
   markMessagesAsSeen,
   getUnseenMessagesCount,
+  deletePreviousChat,
+  softDeletedPreviousChat,
+  deleteSingleMessage,
+  softDeleteSingleChat,
+  deleteGroupMessages,
+  softDeleteGroupMessages,
+  softDeleteSingleGroupMessage
 };

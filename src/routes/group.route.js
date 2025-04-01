@@ -6,43 +6,43 @@ const upload = require("../services/multer.service");
 router.post(
   "/create",
   upload.single("image"),
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   groupController.createGroup
 );
 router.post(
   "/addMember/:groupId",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   groupController.addMember
 );
 router.post(
   "/removeMember/:groupId",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   groupController.removeMember
 );
 router.post(
   "/promoteMember/:groupId",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   groupController.promoteMember
 );
 router.put(
   "/updateGroup/:groupId",
   upload.single("image"),
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   groupController.updateGroupDetails
 );
 router.delete(
   "/deleteGroup/:groupId",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   groupController.deleteGroup
 );
 router.get(
   "/getAllGroups",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   groupController.getAllGroups
 );
 router.get(
   "/getGroupsByUser",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   groupController.getGroupsByUser
 );
 

@@ -33,7 +33,7 @@ router.get("/getNewsById/:id", newsController.getNewsById);
 router.put(
   "/updateNews/:id",
   upload.single("image"),
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   newsController.updateNews
 );
 router.delete("/deleteNews/:id", auth(["isAdmin"]), newsController.deleteNews);

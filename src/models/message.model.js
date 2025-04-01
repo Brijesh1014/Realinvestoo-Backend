@@ -26,6 +26,11 @@ const messageSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+
+  softDelete:[{
+   isDeleted:Boolean,
+   userId:mongoose.Schema.Types.ObjectId,
+  }]
 });
 
 const Message = mongoose.model("Message", messageSchema);

@@ -15,36 +15,36 @@ const auth = require("../middlewares/auth.middleware");
 
 router.post(
   "/createFolder",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   createFolder
 );
 
 router.post(
   "/createFolderWithUploadFile",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   upload.fields([{ name: "files", maxCount: 10 }]),
   createFolderWithUploadFile
 );
 
-router.get("/getAllFolders", auth(["isEmp", "isAdmin", "isUser"]), getFolders);
+router.get("/getAllFolders", auth(["isBuyer", "isAdmin", "isSeller"]), getFolders);
 
 router.get(
   "/getFolderById/:id",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   getFolderById
 );
 
-router.post("/shareFolder", auth(["isEmp", "isAdmin", "isUser"]), shareFolder);
+router.post("/shareFolder", auth(["isBuyer", "isAdmin", "isSeller"]), shareFolder);
 
 router.put(
   "/unshareFolder",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   unshareFolder
 );
 
 router.delete(
   "/deleteFolder/:folderId",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   deleteFolder
 );
 

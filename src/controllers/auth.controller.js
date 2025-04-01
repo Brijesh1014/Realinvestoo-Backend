@@ -23,22 +23,21 @@ const register = async (req, res) => {
       reasonForJoining,
       isAdmin,
       isAgent,
-      isProuser,
-      isEmp,
-      isUser,
+      isBuyer,
+      isSeller,
     } = req.body;
 
     const existingUser = await User_Model.findOne({ email });
     if (existingUser) {
       return res
         .status(400)
-        .json({ message: "User already exists with that email" });
+        .json({success:false, message: "User already exists with that email" });
     }
 
     if (!name || !email || !password) {
       return res
         .status(400)
-        .json({ message: "Please enter all required fields" });
+        .json({success:false, message: "Please enter all required fields" });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -57,9 +56,8 @@ const register = async (req, res) => {
       reasonForJoining,
       isAdmin,
       isAgent,
-      isProuser,
-      isEmp,
-      isUser,
+      isBuyer,
+      isSeller,
     });
 
     await newUser.save();
@@ -98,8 +96,8 @@ const login = async (req, res) => {
         user._id,
         user?.isAdmin,
         user?.isAgent,
-        user?.isEmp,
-        user?.isUser
+        user?.isSeller,
+        user?.isBuyer
       );
 
     return res.status(200).json({
@@ -151,8 +149,8 @@ const refreshToken = async (req, res) => {
             email: user.email,
             isAdmin: user?.isAdmin,
             isAgent: user?.isAgent,
-            isEmp: user?.isEmp,
-            isUser: user?.isUser,
+            isSeller: user?.isSeller,
+            isBuyer: user?.isBuyer,
           },
           process.env.ACCESS_TOKEN_PRIVATE_KEY,
           { expiresIn: process.env.ACCESS_TOKEN_EXPIRY }
@@ -205,8 +203,8 @@ const googleLogin = async (req, res) => {
         user._id,
         user?.isAdmin,
         user?.isAgent,
-        user?.isEmp,
-        user?.isUser
+        user?.isSeller,
+        user?.isBuyer,
       );
     return res.status(200).json({
       success: true,
@@ -235,15 +233,6 @@ const googleAuth = async (req, res) => {
     const { sub, given_name, family_name, email, picture } =
       ticket.getPayload();
 
-    const user = await User_Model.findOneAndUpdate(
-      { email, googleId: sub },
-      {
-        googleToken: token,
-        profileImage: picture,
-        name: `${given_name} ${family_name}`,
-      },
-      { upsert: true, new: true }
-    );
 
     if (user) {
       const {
@@ -256,8 +245,8 @@ const googleAuth = async (req, res) => {
         user._id,
         user?.isAdmin,
         user?.isAgent,
-        user?.isEmp,
-        user?.isUser
+        user?.isSeller,
+        user?.isBuyer
       );
       return res.status(200).json({
         success: true,
@@ -268,11 +257,17 @@ const googleAuth = async (req, res) => {
         accessTokenExpiry,
         refreshTokenExpiry,
       });
-    } else {
-      return res
-        .status(400)
-        .json({ success: false, message: "User not found or created." });
-    }
+    } 
+    const user = await User_Model.findOneAndUpdate(
+      { email, googleId: sub },
+      {
+        googleToken: token,
+        profileImage: picture,
+        name: `${given_name} ${family_name}`,
+      },
+      { upsert: true, new: true }
+    );
+
   } catch (error) {
     res
       .status(500)
@@ -308,8 +303,8 @@ const appleAuth = async (req, res) => {
           user._id,
           user?.isAdmin,
           user?.isAgent,
-          user?.isEmp,
-          user?.isUser
+          user?.isSeller,
+          user?.isBuyer
         );
 
         return res.status(200).json({

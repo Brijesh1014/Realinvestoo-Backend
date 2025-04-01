@@ -137,15 +137,26 @@ const initSocketIo = (io) => {
     });
 
     // Retrieve previous chat
-    socket.on("getPreviousChat", async ({ userId1, userId2 }) => {
+    socket.on("getPreviousChat", async ({ userId1, userId2, currentUserId }) => {
       try {
+
         const messages = await Message.find({
           $or: [
             { senderId: userId1, receiverId: userId2 },
             { senderId: userId2, receiverId: userId1 },
           ],
+          $nor: [
+            { 
+              softDelete: { 
+                $elemMatch: { 
+                  userId: new mongoose.Types.ObjectId(currentUserId),
+                  isDeleted: true 
+                }
+              }
+            }
+          ],
         }).sort({ timestamp: 1 });
-
+    
         socket.emit("previousChat", {
           success: true,
           message: "Previous chat retrieved successfully",
@@ -160,18 +171,35 @@ const initSocketIo = (io) => {
         });
       }
     });
-
+    
+    
     socket.on("getChatPartners", async (userId) => {
       try {
         const userIdString = userId?.userId || userId;
         const objectIdUserId = new mongoose.Types.ObjectId(userIdString);
-
+    
         const chatPartners = await Message.aggregate([
           {
             $match: {
-              $or: [
-                { senderId: objectIdUserId },
-                { receiverId: objectIdUserId },
+              $and: [
+                {
+                  $or: [
+                    { senderId: objectIdUserId },
+                    { receiverId: objectIdUserId },
+                  ],
+                },
+                {
+                  $nor: [
+                    {
+                      softDelete: {
+                        $elemMatch: {
+                          userId: objectIdUserId,
+                          isDeleted: true,
+                        },
+                      },
+                    },
+                  ],
+                },
               ],
             },
           },
@@ -185,6 +213,7 @@ const initSocketIo = (io) => {
                 },
               },
               lastMessage: { $last: "$content" },
+              messageId:{$last:"$_id"},
               lastMessageTime: { $last: "$timestamp" },
               unseenMessages: {
                 $sum: {
@@ -221,13 +250,14 @@ const initSocketIo = (io) => {
               lastMessage: 1,
               lastMessageTime: 1,
               unseenMessages: 1,
+              messageId:1
             },
           },
           {
             $sort: { lastMessageTime: -1 },
           },
         ]);
-
+    
         socket.emit("chatPartners", {
           success: true,
           message: "Chat partners retrieved successfully",
@@ -242,6 +272,7 @@ const initSocketIo = (io) => {
         });
       }
     });
+    
 
     socket.on("getAllGroups", async (userId) => {
       try {
@@ -253,13 +284,27 @@ const initSocketIo = (io) => {
           });
         }
         const groups = await Group.find().sort({ createdAt: -1 });
-        const groupsWithLastMessage = await Promise.all(groups.map(async (group) => {
-          const lastMessage = await Message.findOne({ groupId: group._id })
-            .sort({ createdAt: -1 })
-            .limit(1); 
+        const groupsWithLastMessage = await Promise.all(
+          groups.map(async (group) => {
+            const lastMessage = await Message.findOne({
+              groupId: group._id,
+              $nor: [
+                {
+                  softDelete: {
+                    $elemMatch: {
+                      userId: new mongoose.Types.ObjectId(userId.userId),
+                      isDeleted: true,
+                    },
+                  },
+                },
+              ],
+            })
+              .sort({ createdAt: -1 })
+              .limit(1); 
     
           return {
             ...group.toObject(),
+            lastMessageId : lastMessage? lastMessage._id : null,
             lastMessage: lastMessage ? lastMessage.content : null, 
           };
         }));
@@ -377,7 +422,19 @@ const initSocketIo = (io) => {
           {
             $match: {
               groupId: objectIdGroupId,
+      
+              $nor: [
+                {
+                  softDelete: {
+                    $elemMatch: {
+                      userId: objectIdUserId,
+                      isDeleted: true,
+                    },
+                  },
+                },
+              ],
             },
+            
           },
           {
             $lookup: {

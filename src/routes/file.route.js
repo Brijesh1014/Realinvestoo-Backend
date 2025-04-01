@@ -7,50 +7,50 @@ const auth = require("../middlewares/auth.middleware");
 
 router.post(
   "/file",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   upload.fields([{ name: "file", maxCount: 10 }]),
   fileController.uploadFile
 );
 
 router.get(
   "/getFilesInFolder/:folderId",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   fileController.getFilesInFolder
 );
 
 router.put(
   "/removeFile",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   fileController.removeFile
 );
 
 router.put(
   "/shareFile",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   fileController.shareFile
 );
 
 router.put(
   "/unshareFile",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   fileController.unshareFile
 );
 
 router.delete(
   "/deleteAllUploadedFile/:fileId",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   fileController.deleteAllUploadedFile
 );
 
 router.get(
   "/getAllFiles",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   fileController.getAllFiles
 );
 
 router.get(
   "/getFileById/:id",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   fileController.getFilesById
 );
 

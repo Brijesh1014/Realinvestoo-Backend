@@ -5,19 +5,19 @@ const router = express.Router();
 
 router.post(
   "/",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   FavoritesController.createFavoritesProperty
 );
 
 router.get(
   "/getAllByUser",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   FavoritesController.getAllByUser
 );
 
 router.delete(
   "/removeFavorites/:id",
-  auth(["isEmp", "isAdmin", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller"]),
   FavoritesController.removeFavorites
 );
 

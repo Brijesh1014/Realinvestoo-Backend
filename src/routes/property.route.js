@@ -6,7 +6,7 @@ const upload = require("../services/multer.service");
 
 router.post(
   "/createProperty",
-  auth(["isEmp", "isAdmin", "isUser", "isAgent"]),
+   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   upload.fields([
     { name: "mainPhoto", maxCount: 1 },
     { name: "sliderPhotos", maxCount: 10 },
@@ -16,88 +16,88 @@ router.post(
 
 router.get(
   "/getAllProperties",
-  auth(["isEmp", "isAdmin", "isUser", "isAgent"]),
+   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.getAllProperties
 );
 
 router.get(
   "/getPropertyById/:id",
-  auth(["isEmp", "isAdmin", "isUser", "isAgent"]),
+   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.getPropertyById
 );
 
 router.put(
   "/updateProperty/:id",
   upload.single("mainPhoto"),
-  auth(["isEmp", "isAdmin", "isUser", "isAgent"]),
+   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.updateProperty
 );
 
 router.put(
   "/uploadNewSliderImages/:id",
   upload.fields([{ name: "sliderPhotos", maxCount: 10 }]),
-  auth(["isEmp", "isAdmin", "isUser", "isAgent"]),
+   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.uploadNewSliderPhoto
 );
 
 router.post(
   "/removeSliderImages",
-  auth(["isEmp", "isAdmin", "isUser", "isAgent"]),
+   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.removeSliderImages
 );
 
 router.delete(
   "/deleteProperty/:id",
-  auth(["isEmp", "isAdmin", "isUser", "isAgent"]),
+   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.deleteProperty
 );
 
 router.post(
   "/addReview/:propertyId",
-  auth(["isEmp", "isAdmin", "isUser", "isAgent"]),
+   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.addReview
 );
 
 router.post(
   "/createAppointment",
-  auth(["isEmp", "isAdmin", "isUser", "isAgent"]),
+   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.createAppointment
 );
 
 router.get(
   "/getAllAppointments",
-  auth(["isEmp", "isAdmin", "isUser", "isAgent"]),
+   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.getAllAppointments
 );
 
 router.get(
   "/getAppointmentById/:id",
-  auth(["isEmp", "isAdmin", "isUser", "isAgent"]),
+   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.getAppointmentById
 );
 
 router.get(
   "/getUserAppointments",
-  auth(["isEmp", "isAdmin", "isUser", "isAgent"]),
+   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.getUserAppointments
 );
 
 router.put(
   "/updateAppointment/:id",
-  auth(["isEmp", "isAdmin", "isUser", "isAgent"]),
+   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.updateAppointment
 );
 
 router.delete(
   "/deleteAppointment/:id",
-  auth(["isEmp", "isAdmin", "isUser", "isAgent"]),
+   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.deleteAppointment
 );
 
 router.get("/analyticDashboard", auth(["isAdmin"]), propertyController.analyticDashboard);
 router.get(
   "/getPropertyByAgentId/:id",
-  auth(["isEmp", "isAdmin", "isUser", "isAgent"]),
+   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.getPropertyByAgentId
 );
 

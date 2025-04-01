@@ -5,30 +5,30 @@ const auth = require("../middlewares/auth.middleware");
 
 router.get(
   "/getAllNotifications",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   notificationController.getAllNotification
 );
 router.get(
   "/getNotificationById/:id",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   notificationController.getNotificationById
 );
 
 router.get(
   "/getNotificationBySenderId/:senderId",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   notificationController.getNotificationsBySenderId
 );
 
 router.get(
   "/getNotificationByRecipientId/:recipientId",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   notificationController.getNotificationsByRecipientId
 );
 
 router.delete(
   "/deleteNotification/:notificationId",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   notificationController.deleteNotification
 );
 

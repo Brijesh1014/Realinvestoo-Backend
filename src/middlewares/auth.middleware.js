@@ -45,8 +45,8 @@ const auth =
       req.userEmail = decoded.email;
       req.isAdmin = decoded.isAdmin;
       req.isAgent = decoded.isAgent;
-      req.isEmp = decoded.isEmp;
-      req.isUser = decoded.isUser;
+      req.isSeller = decoded.isSeller;
+      req.isBuyer = decoded.isBuyer;
 
       next();
     } catch (err) {

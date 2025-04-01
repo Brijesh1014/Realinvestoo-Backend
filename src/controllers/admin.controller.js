@@ -12,7 +12,7 @@ const getAllUsers = async (req, res) => {
 
     const totalUsersCount = await User_Model.countDocuments();
 
-    const users = await User_Model.find().skip(skip).limit(pageSize);
+    const users = await User_Model.find().skip(skip).limit(pageSize).sort({createdAt:-1});
 
     const totalPages = Math.ceil(totalUsersCount / pageSize);
     const remainingPages =

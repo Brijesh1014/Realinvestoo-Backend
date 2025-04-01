@@ -6,8 +6,8 @@ const generateTokens = async (
   userId,
   isAdmin,
   isAgent,
-  isEmp,
-  isUser
+  isSeller,
+  isBuyer
 ) => {
   try {
     if (!email || !userId) {
@@ -22,8 +22,8 @@ const generateTokens = async (
       id: userId,
       isAdmin,
       isAgent,
-      isEmp,
-      isUser,
+      isSeller,
+      isBuyer,
     };
 
     const [accessToken, refreshToken] = [

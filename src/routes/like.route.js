@@ -5,12 +5,12 @@ const auth = require("../middlewares/auth.middleware");
 
 router.post(
   "/",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   likeController.like
 );
 router.get(
   "/getUserLikedProperties",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   likeController.getUserLikedProperties
 );
 

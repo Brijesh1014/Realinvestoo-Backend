@@ -12,12 +12,12 @@ router.post(
 );
 router.get(
   "/getAllCoupons",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   couponController.getAllCoupon
 );
 router.get(
   "/getCouponById/:id",
-  auth(["isEmp", "isAdmin", "isProuser", "isAgent", "isUser"]),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   couponController.getCouponById
 );
 router.put(
