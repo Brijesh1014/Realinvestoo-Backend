@@ -64,6 +64,9 @@ const User = new Schema(
     fcmToken: {
       type: String,
     },
+    dob:{
+      type: Date,
+    }
   },
   { timestamps: true }
 );

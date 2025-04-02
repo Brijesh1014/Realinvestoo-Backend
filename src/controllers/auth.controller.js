@@ -25,6 +25,7 @@ const register = async (req, res) => {
       isAgent,
       isBuyer,
       isSeller,
+      dob
     } = req.body;
 
     const existingUser = await User_Model.findOne({ email });
@@ -58,6 +59,7 @@ const register = async (req, res) => {
       isAgent,
       isBuyer,
       isSeller,
+      dob
     });
 
     await newUser.save();

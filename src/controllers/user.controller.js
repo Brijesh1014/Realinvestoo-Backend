@@ -57,7 +57,8 @@ const editProfile = async (req, res) => {
       isAdmin,
       isAgent,
       isBuyer,
-      isSeller
+      isSeller,
+      dob
     } = req.body;
 
     if (!id) {
@@ -77,6 +78,7 @@ const editProfile = async (req, res) => {
       zipCode,
       reasonForJoining,
       username,
+      dob
     };
 
     let profileImageUrl;
