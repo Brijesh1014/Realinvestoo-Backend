@@ -12,9 +12,42 @@ const reviewSchema = new mongoose.Schema(
 const propertySchema = new mongoose.Schema(
   {
     propertyName: { type: String },
-    propertyType: { type: String },
+    propertyType: { type: mongoose.Schema.Types.ObjectId, ref: "PropertyType" },
+    listingType: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "PropertyListingType",
+    },
+    negotiable: { type: Boolean, default: false },
+    dateOfListing: { type: Date, default: Date.now },
+    builtUpArea: { type: Number },
+    floorNumber: { type: Number },
+    totalFloors: { type: Number },
+    balconyOrTerrace: { type: Boolean, default: false },
+    furnishingStatus: {
+      type: String,
+      enum: ["Furnished", "Semi-Furnished", "Unfurnished"],
+    },
+    neighborhood: {
+      type: String,
+    },
+    ownershipStatus: {
+      type: String,
+    },
+    legalStatus: {
+      type: String,
+    },
+    description: {
+      type: String,
+    },
+    builtYear: {
+      type: String,
+    },
+
+    videoLink: {
+      type: String,
+    },
     propertySize: { type: Number },
-    rentOrSale: { type: String, enum: ["Rent","Sale", "PG"] },
+    rentOrSale: { type: String, enum: ["Rent", "Sale", "PG"] },
     agent: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     bedroom: { type: Number },
     bathroom: { type: Number },
@@ -34,8 +67,6 @@ const propertySchema = new mongoose.Schema(
     zipcode: { type: String },
     longitude: { type: Number },
     latitude: { type: Number },
-    mainPhoto: { type: String },
-    sliderPhotos: { type: [String] },
     bestOffer: { type: Boolean, default: false },
     recommended: { type: Boolean, default: false },
     ratings: { type: Number, default: 0 },
@@ -45,6 +76,11 @@ const propertySchema = new mongoose.Schema(
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     expenses: { type: Number },
     socialSource: { type: Number },
+
+    mainPhoto: { type: String },
+    sliderPhotos: { type: [String] },
+    floorPlanUpload:{ type: [String] },
+    propertyDocuments:{ type: [String] },
   },
   { timestamps: true }
 );

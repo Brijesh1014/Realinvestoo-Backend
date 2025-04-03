@@ -8,48 +8,67 @@ const {
 } = require("../services/cloudinary.service");
 const Favorites = require("../models/favorites.model");
 const FCMService = require("../services/notification.service");
+const PropertyListingType = require("../models/propertyListingType.model");
+const PropertyType = require("../models/propertyType.model");
 
 const createProperty = async (req, res) => {
   try {
-    let mainPhotoUrl = null;
-    if (req.files && req.files.mainPhoto && req.files.mainPhoto[0]) {
-      const mainPhoto = req.files.mainPhoto[0];
-      if (mainPhoto.mimetype.startsWith("image/")) {
-        mainPhotoUrl = await uploadToCloudinary(mainPhoto);
-      } else {
-        return res.status(400).json({
-          success: false,
-          message: "Main photo must be an image",
-        });
-      }
+    const {
+      propertyName,
+      propertyType,
+      listingType,
+      address,
+      price,
+      bedroom,
+      bathroom,
+      country,
+      state,
+      city,
+      zipcode,
+    } = req.body;
+
+    const missingFields = [];
+    if (!propertyName) missingFields.push("propertyName");
+    if (!propertyType) missingFields.push("propertyType");
+    if (!listingType) missingFields.push("listingType");
+    if (!address) missingFields.push("address");
+    if (!price) missingFields.push("price");
+    if (!bedroom) missingFields.push("bedroom");
+    if (!bathroom) missingFields.push("bathroom");
+    if (!country) missingFields.push("country");
+    if (!state) missingFields.push("state");
+    if (!city) missingFields.push("city");
+    if (!zipcode) missingFields.push("zipcode");
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Missing required fields: ${missingFields.join(", ")}`,
+      });
     }
 
-    let sliderPhotosUrl = [];
-    if (
-      req.files &&
-      req.files.sliderPhotos &&
-      req.files.sliderPhotos.length > 0
-    ) {
-      const sliderPhotos = req.files.sliderPhotos;
-      for (const photo of sliderPhotos) {
-        if (photo.mimetype.startsWith("image/")) {
-          const photoUrl = await uploadToCloudinary(photo);
-          sliderPhotosUrl.push(photoUrl);
-        } else {
-          return res.status(400).json({
-            success: false,
-            message: "All slider photos must be images",
-          });
-        }
-      }
+    const existingPropertyType = await PropertyType.findById(propertyType);
+    if (!existingPropertyType) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid property type",
+      });
+    }
+
+    const existingListingType = await PropertyListingType.findById(listingType);
+    if (!existingListingType) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid listing type",
+      });
     }
 
     if (req.body.agent) {
-      const agentIsExits = await User.findOne({
+      const agentExists = await User.findOne({
         _id: req.body.agent,
         isAgent: true,
       });
-      if (!agentIsExits) {
+      if (!agentExists) {
         return res.status(400).json({
           success: false,
           message: "Agent not found",
@@ -58,11 +77,10 @@ const createProperty = async (req, res) => {
     }
 
     const propertyDetails = new Property({
-      mainPhoto: mainPhotoUrl || null,
-      sliderPhotos: sliderPhotosUrl.length > 0 ? sliderPhotosUrl : null,
       createdBy: req.userId,
       ...req.body,
     });
+
     const senderId = req.userId;
     const message = `Check out the latest property: ${propertyDetails.propertyName}`;
     await FCMService.sendNotificationToAllUsers(
@@ -82,6 +100,38 @@ const createProperty = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to create property",
+      error: error.message,
+    });
+  }
+};
+
+const uploadFile = async (req, res) => {
+  try {
+    if (!req.files && !req.files.file && req.files.file.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No files uploaded",
+      });
+    }
+
+    let fileUrls = [];
+    const files = req.files.file;
+
+    for (const doc of files) {
+      const docUrl = await uploadToCloudinary(doc);
+      fileUrls.push(docUrl);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Files uploaded successfully",
+      fileUrls,
+    });
+  } catch (error) {
+    console.error("File Upload Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "File upload failed",
       error: error.message,
     });
   }
@@ -213,6 +263,8 @@ const getAllProperties = async (req, res) => {
     const properties = await Property.find(query)
       .skip(skip)
       .limit(pageSize)
+      .populate("propertyType")
+      .populate("listingType")
       .sort({ createdAt: -1 });
 
     if (req.userId) {
@@ -260,7 +312,9 @@ const getAllProperties = async (req, res) => {
 
 const getPropertyById = async (req, res) => {
   try {
-    const property = await Property.findById(req.params.id);
+    const property = await Property.findById(req.params.id)
+      .populate("propertyType")
+      .populate("listingType");
 
     if (!property) {
       return res.status(404).json({
@@ -297,18 +351,43 @@ const updateProperty = async (req, res) => {
   try {
     const userId = req.userId;
     let property = await Property.findById(req.params.id);
+
     if (!property) {
       return res.status(404).json({
         success: false,
         message: "Property not found",
       });
     }
-    
-    if (property.createdBy != userId) {
-      return res.status(400).json({
+
+    if (property.createdBy.toString() !== userId) {
+      return res.status(403).json({
         success: false,
-        message: "You do not have permission to update the appointment.",
+        message: "You do not have permission to update this property.",
       });
+    }
+
+    if (req.body.propertyType) {
+      const existingPropertyType = await PropertyType.findById(
+        req.body.propertyType
+      );
+      if (!existingPropertyType) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid property type",
+        });
+      }
+    }
+
+    if (req.body.listingType) {
+      const existingListingType = await PropertyListingType.findById(
+        req.body.listingType
+      );
+      if (!existingListingType) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid listing type",
+        });
+      }
     }
 
     if (req.file) {
@@ -335,15 +414,11 @@ const updateProperty = async (req, res) => {
         req.body.mainPhoto = uploadResult;
       }
     }
+
     property = await Property.findByIdAndUpdate(
       req.params.id,
-      {
-        ...req.body,
-      },
-      {
-        new: true,
-        runValidators: true,
-      }
+      { ...req.body },
+      { new: true, runValidators: true }
     );
 
     const senderId = req.userId;
@@ -495,6 +570,46 @@ const deleteProperty = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to delete property",
+      error: error.message,
+    });
+  }
+};
+
+const deleteFile = async (req, res) => {
+  try {
+    const { fileUrl } = req.body;
+
+    if (!fileUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "File URL is required",
+      });
+    }
+
+    const urlParts = fileUrl.split("/");
+    const fileNameWithVersion =
+      urlParts[urlParts.length - 2] + "/" + urlParts[urlParts.length - 1];
+
+    const publicId = fileNameWithVersion.replace(/^v\d+\//, "").split(".")[0];
+
+    const result = await cloudinary.uploader.destroy(publicId);
+
+    if (result.result !== "ok") {
+      return res.status(400).json({
+        success: false,
+        message: "Failed to delete file from Cloudinary",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "File deleted successfully",
+    });
+  } catch (error) {
+    console.error("File Deletion Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete file",
       error: error.message,
     });
   }
@@ -674,7 +789,8 @@ const getAllAppointments = async (req, res) => {
       .populate("agent", "name email profileImage phoneNo")
       .populate("createdBy", "name email profileImage phoneNo")
       .skip(skip)
-      .limit(pageSize);
+      .limit(pageSize)
+      .sort({ createdAt: -1 });
 
     const totalPages = Math.ceil(totalAppointmentsCount / pageSize);
     const remainingPages =
@@ -1100,6 +1216,336 @@ const getPropertyByAgentId = async (req, res) => {
   }
 };
 
+const createPropertyListingType = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { name } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: "Name is required",
+      });
+    }
+
+    const isExist = await PropertyListingType.findOne({ name });
+    if (isExist) {
+      return res.status(400).json({
+        success: false,
+        message: "Property Listing Type already exists",
+      });
+    }
+
+    const propertyListingType = await PropertyListingType.create({
+      name,
+      createdBy: userId,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Property Listing Type created successfully",
+      data: propertyListingType,
+    });
+  } catch (error) {
+    console.error("Error creating property listing type:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+const getAllPropertyListingTypes = async (req, res) => {
+  try {
+    const propertyListingTypes = await PropertyListingType.find();
+    return res.status(200).json({
+      success: true,
+      data: propertyListingTypes,
+      message: "Property listing types retrieved successfully",
+    });
+  } catch (error) {
+    console.error("Error fetching property listing types:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching property listing types",
+      error: error.message,
+    });
+  }
+};
+const updatePropertyListingType = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: "Name is required",
+      });
+    }
+
+    const isExist = await PropertyListingType.findOne({ name });
+    if (isExist && isExist.id !== id) {
+      return res.status(400).json({
+        success: false,
+        message: "Property Listing Type with this name already exists",
+      });
+    }
+
+    const propertyListingType = await PropertyListingType.findByIdAndUpdate(
+      id,
+      { name },
+      { new: true, runValidators: true }
+    );
+
+    if (!propertyListingType) {
+      return res.status(404).json({
+        success: false,
+        message: "Property Listing Type not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Property Listing Type updated successfully",
+      data: propertyListingType,
+    });
+  } catch (error) {
+    console.error("Error updating property listing type:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while updating property listing type",
+      error: error.message,
+    });
+  }
+};
+const deletePropertyListingType = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const propertyListingType = await PropertyListingType.findById(id);
+    if (!propertyListingType) {
+      return res.status(404).json({
+        success: false,
+        message: "Property Listing Type not found",
+      });
+    }
+
+    await Property.updateMany(
+      { listingType: id },
+      { $unset: { listingType: "" } }
+    );
+
+    await PropertyListingType.findByIdAndDelete(id);
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Property Listing Type deleted successfully and removed from properties",
+    });
+  } catch (error) {
+    console.error("Error deleting property listing type:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while deleting property listing type",
+      error: error.message,
+    });
+  }
+};
+
+const getPropertyListingTypeById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const propertyListingType = await PropertyListingType.findById(id);
+
+    if (!propertyListingType) {
+      return res.status(404).json({
+        success: false,
+        message: "Property Listing Type not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: propertyListingType,
+      message: "Property Listing Type retrieved successfully",
+    });
+  } catch (error) {
+    console.error("Error fetching property listing type:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching property listing type",
+      error: error.message,
+    });
+  }
+};
+
+const createPropertyType = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: "Name is required",
+      });
+    }
+
+    const isExist = await PropertyType.findOne({ name });
+    if (isExist) {
+      return res.status(400).json({
+        success: false,
+        message: "Property Type already exists",
+      });
+    }
+
+    const propertyType = await PropertyType.create({
+      name,
+      createdBy: userId,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Property Type created successfully",
+      data: propertyType,
+    });
+  } catch (error) {
+    console.error("Error creating property type:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
+const getAllPropertyType = async (req, res) => {
+  try {
+    const propertyTypes = await PropertyType.find();
+    return res.status(200).json({
+      success: true,
+      data: propertyTypes,
+      message: "Property types retrieved successfully",
+    });
+  } catch (error) {
+    console.error("Error fetching property types:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching property types",
+      error: error.message,
+    });
+  }
+};
+
+const getPropertyTypeById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const propertyType = await PropertyType.findById(id);
+
+    if (!propertyType) {
+      return res.status(404).json({
+        success: false,
+        message: "Property Type not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: propertyType,
+      message: "Property type retrieved successfully",
+    });
+  } catch (error) {
+    console.error("Error fetching property type:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching property type",
+      error: error.message,
+    });
+  }
+};
+
+const updatePropertyType = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: "Name is required",
+      });
+    }
+
+    let propertyType = await PropertyType.findById(id);
+    if (!propertyType) {
+      return res.status(404).json({
+        success: false,
+        message: "Property Type not found",
+      });
+    }
+
+    const isExist = await PropertyType.findOne({ name });
+    if (isExist && isExist.id !== id) {
+      return res.status(400).json({
+        success: false,
+        message: "Property Type with this name already exists",
+      });
+    }
+
+    propertyType = await PropertyType.findByIdAndUpdate(
+      id,
+      { name },
+      { new: true, runValidators: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Property Type updated successfully",
+      data: propertyType,
+    });
+  } catch (error) {
+    console.error("Error updating property type:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while updating property type",
+      error: error.message,
+    });
+  }
+};
+
+const deletePropertyType = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const propertyType = await PropertyType.findById(id);
+    if (!propertyType) {
+      return res.status(404).json({
+        success: false,
+        message: "Property Type not found",
+      });
+    }
+
+    await Property.updateMany(
+      { propertyType: id },
+      { $unset: { propertyType: "" } }
+    );
+
+    await PropertyType.findByIdAndDelete(id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Property Type deleted successfully and removed from properties",
+    });
+  } catch (error) {
+    console.error("Error deleting property type:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while deleting property type",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createProperty,
   getAllProperties,
@@ -1117,4 +1563,16 @@ module.exports = {
   deleteAppointment,
   analyticDashboard,
   getPropertyByAgentId,
+  createPropertyListingType,
+  getAllPropertyListingTypes,
+  getPropertyListingTypeById,
+  updatePropertyListingType,
+  deletePropertyListingType,
+  createPropertyType,
+  getAllPropertyType,
+  deletePropertyType,
+  updatePropertyType,
+  getPropertyTypeById,
+  uploadFile,
+  deleteFile,
 };
