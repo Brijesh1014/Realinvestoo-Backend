@@ -3,9 +3,16 @@
   "builds": [
     {
       "src": "index.js",
-      "use": "@vercel/edge"
+      "use": "@vercel/node"
     }
   ],
+  "functions": {
+    "index": {
+      "maxDuration": 10,
+      "memory": 256,
+      "maxBodySize": "4.5mb"
+    }
+  },
   "routes": [
     {
       "src": "/(.*)",
