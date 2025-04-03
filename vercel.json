@@ -22,7 +22,7 @@
     "index.js": {
       "maxDuration": 10,
       "memory": 256,
-      "maxBodySize": "50mb"
+      "maxBodySize": "50mb" 
     }
   }
 }
