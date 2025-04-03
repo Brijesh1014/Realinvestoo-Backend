@@ -21,8 +21,7 @@
   "functions": {
     "index.js": {
       "maxDuration": "10s",
-      "memory": 256,
-      "maxBodySize": "4.5mb"
+      "memory": 256
     }
   }
 }
