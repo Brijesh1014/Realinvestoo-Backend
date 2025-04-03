@@ -6,13 +6,6 @@
       "use": "@vercel/node"
     }
   ],
-  "functions": {
-    "index": {
-      "maxDuration": 10,
-      "memory": 256,
-      "maxBodySize": "4.5mb"
-    }
-  },
   "routes": [
     {
       "src": "/(.*)",
@@ -24,5 +17,12 @@
         "Access-Control-Allow-Headers": "*"
       }
     }
-  ]
+  ],
+  "functions": {
+    "index.js": {
+      "maxDuration": 10,
+      "memory": 256,
+      "maxBodySize": "50mb"
+    }
+  }
 }
