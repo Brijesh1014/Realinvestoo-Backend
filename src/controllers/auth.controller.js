@@ -2,7 +2,7 @@ const User_Model = require("../models/user.model");
 const Token_Model = require("../models/token.model");
 const { OAuth2Client } = require("google-auth-library");
 const bcrypt = require("bcrypt");
-const generateTokens = require("../utils/generate.token");
+const {generateTokens} = require("../utils/generate.token");
 const dotenv = require("dotenv");
 const jwt = require("jsonwebtoken");
 const sendOtp = require("../services/sendOtp.service");
@@ -77,30 +77,24 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User_Model.findOne({ email: email });
+    const user = await User_Model.findOne({ email });
 
     if (!user) {
-      return res
-        .status(400)
-        .json({ status: -1, message: "You have to register", success: false });
+      return res.status(400).json({ status: -1, message: "You have to register", success: false });
     }
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Password Does Not Match" });
+      return res.status(400).json({ success: false, message: "Password does not match" });
     }
 
-    const { accessToken, refreshToken, accessTokenExpiry, refreshTokenExpiry } =
-      await generateTokens.generateTokens(
-        email,
-        user._id,
-        user?.isAdmin,
-        user?.isAgent,
-        user?.isSeller,
-        user?.isBuyer
-      );
+    const { accessToken, refreshToken, accessTokenExpiry, refreshTokenExpiry } = await generateTokens(
+      email,
+      user._id,
+      user?.isAdmin,
+      user?.isAgent,
+      user?.isEmp
+    );
 
     return res.status(200).json({
       success: true,

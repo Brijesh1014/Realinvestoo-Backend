@@ -1,14 +1,7 @@
 const jwt = require("jsonwebtoken");
 const UserToken = require("../models/token.model");
 
-const generateTokens = async (
-  email,
-  userId,
-  isAdmin,
-  isAgent,
-  isSeller,
-  isBuyer
-) => {
+const generateTokens = async (email, userId, isAdmin, isAgent, isSeller, isBuyer) => {
   try {
     if (!email || !userId) {
       throw new Error("Email and userId are required to generate tokens");
@@ -17,25 +10,12 @@ const generateTokens = async (
     const accessTokenExpiry = process.env.ACCESS_TOKEN_EXPIRY;
     const refreshTokenExpiry = process.env.REFRESH_TOKEN_EXPIRY;
 
-    const payload = {
-      email,
-      id: userId,
-      isAdmin,
-      isAgent,
-      isSeller,
-      isBuyer,
-    };
+    const payload = { email, id: userId, isAdmin, isAgent, isSeller, isBuyer };
 
     const [accessToken, refreshToken] = [
-      jwt.sign(payload, process.env.ACCESS_TOKEN_PRIVATE_KEY, {
-        expiresIn: accessTokenExpiry,
-      }),
-      jwt.sign(payload, process.env.REFRESH_TOKEN_PRIVATE_KEY, {
-        expiresIn: refreshTokenExpiry,
-      }),
+      jwt.sign(payload, process.env.ACCESS_TOKEN_PRIVATE_KEY, { expiresIn: accessTokenExpiry }),
+      jwt.sign(payload, process.env.REFRESH_TOKEN_PRIVATE_KEY, { expiresIn: refreshTokenExpiry }),
     ];
-
-    await UserToken.deleteMany({ userId });
 
     await UserToken.create({
       userId,
@@ -55,4 +35,5 @@ const generateTokens = async (
     throw new Error(`Failed to generate tokens: ${error.message}`);
   }
 };
+
 module.exports = { generateTokens };
