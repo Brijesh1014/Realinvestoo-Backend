@@ -20,7 +20,7 @@
   ],
   "functions": {
     "index.js": {
-      "maxDuration": "10s",
+      "maxDuration": 10,
       "memory": 256
     }
   }
