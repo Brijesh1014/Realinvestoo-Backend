@@ -20,9 +20,9 @@
   ],
   "functions": {
     "index.js": {
-      "maxDuration": 10,
+      "maxDuration": "10s",
       "memory": 256,
-      "maxBodySize": "50mb" 
+      "maxBodySize": "4.5mb"
     }
   }
 }
