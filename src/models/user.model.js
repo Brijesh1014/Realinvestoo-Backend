@@ -9,6 +9,12 @@ const User = new Schema(
     email: {
       type: String,
     },
+    firstName:{
+      type: String,
+    },
+    lastName:{
+      type: String,
+    },
     phoneNo: {
       type: Number,
     },

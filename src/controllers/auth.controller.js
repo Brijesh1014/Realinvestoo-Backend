@@ -25,6 +25,8 @@ const register = async (req, res) => {
       isAgent,
       isBuyer,
       isSeller,
+      firstName,
+      lastName,
       dob
     } = req.body;
 
@@ -59,7 +61,9 @@ const register = async (req, res) => {
       isAgent,
       isBuyer,
       isSeller,
-      dob
+      dob,
+      firstName,
+      lastName
     });
 
     await newUser.save();
@@ -526,6 +530,52 @@ const saveFcmToken = async (req, res) => {
     });
   }
 };
+
+const checkEmailOrPhoneNumber = async (req, res) => {
+  try {
+    const { email, phoneNo } = req.body;
+
+    if (!email && !phoneNo) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide either an email or phone number.",
+      });
+    }
+
+    if (email) {
+      const emailExists = await User_Model.findOne({ email });
+      if (emailExists) {
+        return res.status(400).json({
+          success: false,
+          message: "Email is already in use.",
+        });
+      }
+    }
+
+    if (phoneNo) {
+      const phoneExists = await User_Model.findOne({ phoneNo });
+      if (phoneExists) {
+        return res.status(400).json({
+          success: false,
+          message: "Phone number is already in use.",
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Email or phone number is available.",
+    });
+  } catch (error) {
+    console.error("Error checking email or phone number:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while checking email or phone number.",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -540,4 +590,5 @@ module.exports = {
   googleAuth,
   saveFcmToken,
   appleAuth,
+  checkEmailOrPhoneNumber
 };

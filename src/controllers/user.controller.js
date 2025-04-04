@@ -58,6 +58,8 @@ const editProfile = async (req, res) => {
       isAgent,
       isBuyer,
       isSeller,
+      firstName,
+      lastName,
       dob
     } = req.body;
 
@@ -78,7 +80,9 @@ const editProfile = async (req, res) => {
       zipCode,
       reasonForJoining,
       username,
-      dob
+      dob,
+      firstName,
+      lastName
     };
 
     let profileImageUrl;
