@@ -37,7 +37,7 @@ const register = async (req, res) => {
         .json({success:false, message: "User already exists with that email" });
     }
 
-    if (!name || !email || !password) {
+    if (!email || !password) {
       return res
         .status(400)
         .json({success:false, message: "Please enter all required fields" });
