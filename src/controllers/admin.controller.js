@@ -3,20 +3,57 @@ const { cloudinary } = require("../services/cloudinary.service");
 
 const getAllUsers = async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      search = "",
+      isAdmin,
+      isAgent,
+      isBuyer,
+      isSeller,
+      gender,
+      country,
+      state,
+      city,
+    } = req.query;
 
     const pageNumber = parseInt(page);
     const pageSize = parseInt(limit);
-
     const skip = (pageNumber - 1) * pageSize;
 
-    const totalUsersCount = await User_Model.countDocuments();
+    const searchRegex = new RegExp(search, "i"); 
+    const searchQuery = search
+      ? {
+          $or: [
+            { name: searchRegex },
+            { email: searchRegex },
+            { username: searchRegex },
+            { firstName: searchRegex },
+            { lastName: searchRegex },
+          ],
+        }
+      : {};
 
-    const users = await User_Model.find().skip(skip).limit(pageSize).sort({createdAt:-1});
+    const filters = {};
+    if (isAdmin !== undefined) filters.isAdmin = isAdmin === "true";
+    if (isAgent !== undefined) filters.isAgent = isAgent === "true";
+    if (isBuyer !== undefined) filters.isBuyer = isBuyer === "true";
+    if (isSeller !== undefined) filters.isSeller = isSeller === "true";
+    if (gender) filters.gender = gender;
+    if (country) filters.country = country;
+    if (state) filters.state = state;
+    if (city) filters.city = city;
+
+    const query = { ...searchQuery, ...filters };
+
+    const totalUsersCount = await User_Model.countDocuments(query);
+    const users = await User_Model.find(query)
+      .skip(skip)
+      .limit(pageSize)
+      .sort({ createdAt: -1 });
 
     const totalPages = Math.ceil(totalUsersCount / pageSize);
-    const remainingPages =
-      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
+    const remainingPages = totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
 
     return res.status(200).json({
       success: true,
@@ -32,11 +69,10 @@ const getAllUsers = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    return res
-      .status(500)
-      .json({ message: "Server error", error: error.message });
+    return res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 const deleteUser = async (req, res) => {
   try {

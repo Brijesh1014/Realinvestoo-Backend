@@ -162,12 +162,38 @@ const getAllProperties = async (req, res) => {
       limit = 10,
       rentOrSale,
       isLike,
+      listingType
     } = req.query;
 
     const query = {};
 
     if (location) query.address = { $regex: location, $options: "i" };
-    if (type) query.propertyType = type;
+    if (type) {
+      const propertyTypeDoc = await PropertyType.findOne({ name: type });
+    
+      if (propertyTypeDoc) {
+        query.propertyType = propertyTypeDoc._id;
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: `Property type "${type}" not found`,
+        });
+      }
+    }
+
+    if (listingType) {
+      const propertyListingTypeDoc = await PropertyListingType.findOne({ name: listingType });
+    
+      if (propertyListingTypeDoc) {
+        query.listingType = propertyListingTypeDoc._id;
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: `Property Listing type "${listingType}" not found`,
+        });
+      }
+    }
+    
     if (minPrice || maxPrice) {
       query.price = { $gte: minPrice || 0, $lte: maxPrice || 1000000 };
     }
