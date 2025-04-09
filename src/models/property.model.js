@@ -42,7 +42,6 @@ const propertySchema = new mongoose.Schema(
     builtYear: {
       type: String,
     },
-
     videoLink: {
       type: String,
     },
@@ -56,7 +55,7 @@ const propertySchema = new mongoose.Schema(
     details: { type: String },
     price: { type: Number },
     currency: { type: String, default: "USD" },
-    amenities: { type: [String] },
+    amenities: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Amenities" },] },
     featured: { type: Boolean, default: false },
     visible: { type: Boolean, default: true },
     new: { type: Boolean, default: false },
@@ -79,8 +78,8 @@ const propertySchema = new mongoose.Schema(
 
     mainPhoto: { type: String },
     sliderPhotos: { type: [String] },
-    floorPlanUpload:{ type: [String] },
-    propertyDocuments:{ type: [String] },
+    floorPlanUpload: { type: [String] },
+    propertyDocuments: { type: [String] },
   },
   { timestamps: true }
 );

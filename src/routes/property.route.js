@@ -161,4 +161,5 @@ router.delete(
   propertyController.deletePropertyType
 );
 
+
 module.exports = router;

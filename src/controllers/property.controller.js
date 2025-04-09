@@ -10,6 +10,7 @@ const Favorites = require("../models/favorites.model");
 const FCMService = require("../services/notification.service");
 const PropertyListingType = require("../models/propertyListingType.model");
 const PropertyType = require("../models/propertyType.model");
+const Amenities = require("../models/amenities.model");
 
 const createProperty = async (req, res) => {
   try {
@@ -60,6 +61,14 @@ const createProperty = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Invalid listing type",
+      });
+    }
+
+    const existingAmenities = await Amenities.findById(listingType);
+    if (!existingAmenities) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Amenities",
       });
     }
 
@@ -162,7 +171,7 @@ const getAllProperties = async (req, res) => {
       limit = 10,
       rentOrSale,
       isLike,
-      listingType
+      listingType,
     } = req.query;
 
     const query = {};
@@ -170,7 +179,7 @@ const getAllProperties = async (req, res) => {
     if (location) query.address = { $regex: location, $options: "i" };
     if (type) {
       const propertyTypeDoc = await PropertyType.findOne({ name: type });
-    
+
       if (propertyTypeDoc) {
         query.propertyType = propertyTypeDoc._id;
       } else {
@@ -182,8 +191,10 @@ const getAllProperties = async (req, res) => {
     }
 
     if (listingType) {
-      const propertyListingTypeDoc = await PropertyListingType.findOne({ name: listingType });
-    
+      const propertyListingTypeDoc = await PropertyListingType.findOne({
+        name: listingType,
+      });
+
       if (propertyListingTypeDoc) {
         query.listingType = propertyListingTypeDoc._id;
       } else {
@@ -193,7 +204,31 @@ const getAllProperties = async (req, res) => {
         });
       }
     }
-    
+
+    if (amenities) {
+      const amenityIds = amenities.split(",").map((a) => a.trim());
+
+      const isValidObjectIds = amenityIds.every((id) =>
+        /^[a-f\d]{24}$/i.test(id)
+      );
+
+      if (isValidObjectIds) {
+        query.amenities = { $all: amenityIds };
+      } else {
+        const amenityDocs = await Amenities.find({ name: { $in: amenityIds } });
+
+        if (amenityDocs.length) {
+          const ids = amenityDocs.map((doc) => doc._id);
+          query.amenities = { $all: ids };
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: "No matching amenities found.",
+          });
+        }
+      }
+    }
+
     if (minPrice || maxPrice) {
       query.price = { $gte: minPrice || 0, $lte: maxPrice || 1000000 };
     }
@@ -204,7 +239,6 @@ const getAllProperties = async (req, res) => {
     if (bathrooms) query.bathroom = { $gte: bathrooms };
     if (kitchen) query.kitchen = { $gte: kitchen };
     if (parking) query.parking = { $gte: parking };
-    if (amenities) query.amenities = { $all: amenities.split(",") };
     if (search) {
       query.$or = [
         { propertyName: { $regex: search, $options: "i" } },
@@ -291,6 +325,7 @@ const getAllProperties = async (req, res) => {
       .limit(pageSize)
       .populate("propertyType")
       .populate("listingType")
+      .populate("amenities")
       .sort({ createdAt: -1 });
 
     if (req.userId) {
@@ -340,7 +375,8 @@ const getPropertyById = async (req, res) => {
   try {
     const property = await Property.findById(req.params.id)
       .populate("propertyType")
-      .populate("listingType");
+      .populate("listingType")
+      .populate("amenities");
 
     if (!property) {
       return res.status(404).json({
@@ -1283,7 +1319,12 @@ const createPropertyListingType = async (req, res) => {
 };
 const getAllPropertyListingTypes = async (req, res) => {
   try {
-    const propertyListingTypes = await PropertyListingType.find();
+    const { search } = req.query;
+    const query = {};
+    if (search) {
+      query.name = { $regex: search, $options: "i" };
+    }
+    const propertyListingTypes = await PropertyListingType.find(query);
     return res.status(200).json({
       success: true,
       data: propertyListingTypes,
@@ -1447,7 +1488,12 @@ const createPropertyType = async (req, res) => {
 
 const getAllPropertyType = async (req, res) => {
   try {
-    const propertyTypes = await PropertyType.find();
+    const { search } = req.query;
+    const query = {};
+    if (search) {
+      query.name = { $regex: search, $options: "i" };
+    }
+    const propertyTypes = await PropertyType.find(query);
     return res.status(200).json({
       success: true,
       data: propertyTypes,
