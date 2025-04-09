@@ -2,7 +2,7 @@ const User_Model = require("../models/user.model");
 const Token_Model = require("../models/token.model");
 const { OAuth2Client } = require("google-auth-library");
 const bcrypt = require("bcrypt");
-const {generateTokens} = require("../utils/generate.token");
+const { generateTokens } = require("../utils/generate.token");
 const dotenv = require("dotenv");
 const jwt = require("jsonwebtoken");
 const sendOtp = require("../services/sendOtp.service");
@@ -27,20 +27,23 @@ const register = async (req, res) => {
       isSeller,
       firstName,
       lastName,
-      dob
+      dob,
     } = req.body;
 
     const existingUser = await User_Model.findOne({ email });
     if (existingUser) {
       return res
         .status(400)
-        .json({success:false, message: "User already exists with that email" });
+        .json({
+          success: false,
+          message: "User already exists with that email",
+        });
     }
 
     if (!email || !password) {
       return res
         .status(400)
-        .json({success:false, message: "Please enter all required fields" });
+        .json({ success: false, message: "Please enter all required fields" });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -63,7 +66,7 @@ const register = async (req, res) => {
       isSeller,
       dob,
       firstName,
-      lastName
+      lastName,
     });
 
     await newUser.save();
@@ -84,21 +87,26 @@ const login = async (req, res) => {
     const user = await User_Model.findOne({ email });
 
     if (!user) {
-      return res.status(400).json({ status: -1, message: "You have to register", success: false });
+      return res
+        .status(400)
+        .json({ status: -1, message: "You have to register", success: false });
     }
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
-      return res.status(400).json({ success: false, message: "Password does not match" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Password does not match" });
     }
 
-    const { accessToken, refreshToken, accessTokenExpiry, refreshTokenExpiry } = await generateTokens(
-      email,
-      user._id,
-      user?.isAdmin,
-      user?.isAgent,
-      user?.isEmp
-    );
+    const { accessToken, refreshToken, accessTokenExpiry, refreshTokenExpiry } =
+      await generateTokens(
+        email,
+        user._id,
+        user?.isAdmin,
+        user?.isAgent,
+        user?.isEmp
+      );
 
     return res.status(200).json({
       success: true,
@@ -204,7 +212,7 @@ const googleLogin = async (req, res) => {
         user?.isAdmin,
         user?.isAgent,
         user?.isSeller,
-        user?.isBuyer,
+        user?.isBuyer
       );
     return res.status(200).json({
       success: true,
@@ -233,7 +241,6 @@ const googleAuth = async (req, res) => {
     const { sub, given_name, family_name, email, picture } =
       ticket.getPayload();
 
-
     if (user) {
       const {
         accessToken,
@@ -257,7 +264,7 @@ const googleAuth = async (req, res) => {
         accessTokenExpiry,
         refreshTokenExpiry,
       });
-    } 
+    }
     const user = await User_Model.findOneAndUpdate(
       { email, googleId: sub },
       {
@@ -267,7 +274,6 @@ const googleAuth = async (req, res) => {
       },
       { upsert: true, new: true }
     );
-
   } catch (error) {
     res
       .status(500)
@@ -480,6 +486,7 @@ const changePassword = async (req, res) => {
 const logout = async (req, res) => {
   try {
     const userId = req.userId;
+    const accessToken = req.headers.authorization;
     const user = await User_Model.findOne({ _id: userId });
     if (!user) {
       return res
@@ -487,10 +494,10 @@ const logout = async (req, res) => {
         .json({ status: -1, message: "You have to register", success: false });
     }
 
-    await Token_Model.findOneAndUpdate(
-      { userId: user._id },
-      { accessToken: "", refreshToken: "" }
-    );
+    await Token_Model.findOneAndDelete({
+      userId: user._id,
+      accessToken: accessToken,
+    });
 
     return res.status(200).json({
       success: true,
@@ -590,5 +597,5 @@ module.exports = {
   googleAuth,
   saveFcmToken,
   appleAuth,
-  checkEmailOrPhoneNumber
+  checkEmailOrPhoneNumber,
 };
