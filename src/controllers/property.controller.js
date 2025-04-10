@@ -172,14 +172,18 @@ const getAllProperties = async (req, res) => {
       rentOrSale,
       isLike,
       listingType,
+      country,
+      state,
+      city,
+      furnishingStatus,
     } = req.query;
 
     const query = {};
 
     if (location) query.address = { $regex: location, $options: "i" };
+
     if (type) {
       const propertyTypeDoc = await PropertyType.findOne({ name: type });
-
       if (propertyTypeDoc) {
         query.propertyType = propertyTypeDoc._id;
       } else {
@@ -194,7 +198,6 @@ const getAllProperties = async (req, res) => {
       const propertyListingTypeDoc = await PropertyListingType.findOne({
         name: listingType,
       });
-
       if (propertyListingTypeDoc) {
         query.listingType = propertyListingTypeDoc._id;
       } else {
@@ -207,7 +210,6 @@ const getAllProperties = async (req, res) => {
 
     if (amenities) {
       const amenityIds = amenities.split(",").map((a) => a.trim());
-
       const isValidObjectIds = amenityIds.every((id) =>
         /^[a-f\d]{24}$/i.test(id)
       );
@@ -216,7 +218,6 @@ const getAllProperties = async (req, res) => {
         query.amenities = { $all: amenityIds };
       } else {
         const amenityDocs = await Amenities.find({ name: { $in: amenityIds } });
-
         if (amenityDocs.length) {
           const ids = amenityDocs.map((doc) => doc._id);
           query.amenities = { $all: ids };
@@ -232,13 +233,16 @@ const getAllProperties = async (req, res) => {
     if (minPrice || maxPrice) {
       query.price = { $gte: minPrice || 0, $lte: maxPrice || 1000000 };
     }
+
     if (minSize || maxSize) {
       query.propertySize = { $gte: minSize || 0, $lte: maxSize || 1000000 };
     }
+
     if (bedrooms) query.bedroom = { $gte: bedrooms };
     if (bathrooms) query.bathroom = { $gte: bathrooms };
     if (kitchen) query.kitchen = { $gte: kitchen };
     if (parking) query.parking = { $gte: parking };
+
     if (search) {
       query.$or = [
         { propertyName: { $regex: search, $options: "i" } },
@@ -246,10 +250,12 @@ const getAllProperties = async (req, res) => {
         { address: { $regex: search, $options: "i" } },
       ];
     }
+
     if (topRated) query.ratings = { $gte: 4 };
     if (bestOffer) query.bestOffer = true;
     if (upcoming) query.new = true;
     if (recommended) query.recommended = true;
+
     if (isFeatured === "true") query.featured = true;
     else if (isFeatured === "false") query.featured = false;
 
@@ -263,11 +269,8 @@ const getAllProperties = async (req, res) => {
       case "PG":
         query.rentOrSale = "PG";
         break;
-      default:
-        break;
     }
 
-    // Time Filters
     if (timeFilter) {
       const now = new Date();
       let startDate;
@@ -281,8 +284,6 @@ const getAllProperties = async (req, res) => {
         case "year":
           startDate = new Date(now.setFullYear(now.getFullYear() - 1));
           break;
-        default:
-          break;
       }
       if (startDate) query.createdAt = { $gte: startDate };
     }
@@ -292,13 +293,32 @@ const getAllProperties = async (req, res) => {
         userId: req.userId,
         isLike: true,
       }).select("propertyId");
-      const likedPropertyIds = userLikes.map((like) => like.propertyId);
 
+      const likedPropertyIds = userLikes.map((like) => like.propertyId);
       if (isLike === "true") {
         query._id = { $in: likedPropertyIds };
       } else if (isLike === "false") {
         query._id = { $nin: likedPropertyIds };
       }
+    }
+
+    if (country) query.country = { $regex: country, $options: "i" };
+    if (state) query.state = { $regex: state, $options: "i" };
+    if (city) query.city = { $regex: city, $options: "i" };
+
+    const validFurnishingStatuses = [
+      "Furnished",
+      "Semi-Furnished",
+      "Unfurnished",
+    ];
+    if (furnishingStatus) {
+      if (!validFurnishingStatuses.includes(furnishingStatus)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid furnishing status: "${furnishingStatus}"`,
+        });
+      }
+      query.furnishingStatus = furnishingStatus;
     }
 
     const pageNumber = parseInt(page);
