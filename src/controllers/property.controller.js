@@ -440,8 +440,7 @@ const updateProperty = async (req, res) => {
         message: "Property not found",
       });
     }
-
-    if (property.createdBy.toString() !== userId) {
+    if (!req.isAdmin && property.createdBy.toString() !== userId) {
       return res.status(403).json({
         success: false,
         message: "You do not have permission to update this property.",
