@@ -26,8 +26,8 @@ const createProperty = async (req, res) => {
       state,
       city,
       zipcode,
+      amenities
     } = req.body;
-
     const missingFields = [];
     if (!propertyName) missingFields.push("propertyName");
     if (!propertyType) missingFields.push("propertyType");
@@ -64,11 +64,14 @@ const createProperty = async (req, res) => {
       });
     }
 
-    const existingAmenities = await Amenities.findById(listingType);
-    if (!existingAmenities) {
+    const existingAmenities = await Amenities.find({ _id: { $in: amenities } });
+    if (existingAmenities.length !== amenities.length) {
       return res.status(400).json({
         success: false,
-        message: "Invalid Amenities",
+        message: "One or more amenities are invalid",
+        invalidAmenities: amenities.filter(
+          id => !existingAmenities.find(a => a._id.toString() === id)
+        ),
       });
     }
 

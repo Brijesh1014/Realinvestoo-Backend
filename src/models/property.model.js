@@ -17,6 +17,7 @@ const propertySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "PropertyListingType",
     },
+    propertyId: { type: String },
     negotiable: { type: Boolean, default: false },
     dateOfListing: { type: Date, default: Date.now },
     builtUpArea: { type: Number },
