@@ -26,7 +26,7 @@ const createProperty = async (req, res) => {
       state,
       city,
       zipcode,
-      amenities
+      amenities,
     } = req.body;
     const missingFields = [];
     if (!propertyName) missingFields.push("propertyName");
@@ -70,7 +70,7 @@ const createProperty = async (req, res) => {
         success: false,
         message: "One or more amenities are invalid",
         invalidAmenities: amenities.filter(
-          id => !existingAmenities.find(a => a._id.toString() === id)
+          (id) => !existingAmenities.find((a) => a._id.toString() === id)
         ),
       });
     }
@@ -443,6 +443,7 @@ const updateProperty = async (req, res) => {
         message: "Property not found",
       });
     }
+
     if (!req.isAdmin && property.createdBy.toString() !== userId) {
       return res.status(403).json({
         success: false,
@@ -471,31 +472,6 @@ const updateProperty = async (req, res) => {
           success: false,
           message: "Invalid listing type",
         });
-      }
-    }
-
-    if (req.file) {
-      if (!req.file.mimetype.startsWith("image/")) {
-        return res.status(400).json({
-          success: false,
-          message: "Main photo must be an image",
-        });
-      }
-
-      const existingMainPhotoPublicId = property.mainPhoto
-        ?.split("/")
-        .pop()
-        .split(".")[0];
-
-      if (existingMainPhotoPublicId) {
-        const uploadResult = await cloudinary.uploader.upload(req.file.path, {
-          public_id: existingMainPhotoPublicId,
-          overwrite: true,
-        });
-        req.body.mainPhoto = uploadResult.secure_url;
-      } else {
-        const uploadResult = await uploadToCloudinary(req.file);
-        req.body.mainPhoto = uploadResult;
       }
     }
 
@@ -572,37 +548,64 @@ const uploadNewSliderPhoto = async (req, res) => {
   }
 };
 
-const removeSliderImages = async (req, res) => {
+const removePropertyImages = async (req, res) => {
   try {
-    const { sliderPhotos, id } = req.body;
-    if (
-      !sliderPhotos ||
-      !Array.isArray(sliderPhotos) ||
-      sliderPhotos.length === 0
-    ) {
-      return res
-        .status(400)
-        .json({ message: "No images specified for removal" });
-    }
+    const {
+      id,
+      sliderPhotos = [],
+      floorPlanUpload = [],
+      propertyDocuments = [],
+      mainPhoto,
+    } = req.body;
 
     const existingProperty = await Property.findById(id);
     if (!existingProperty) {
       return res.status(404).json({ message: "Property not found" });
     }
-    for (const image of sliderPhotos) {
-      const publicId = image.split("/").pop().split(".")[0];
 
+    const deleteFromCloudinary = async (imageUrl) => {
+      const publicId = imageUrl.split("/").pop().split(".")[0];
       await cloudinary.uploader.destroy(publicId);
+    };
+
+    if (Array.isArray(sliderPhotos) && sliderPhotos.length > 0) {
+      for (const image of sliderPhotos) {
+        await deleteFromCloudinary(image);
+      }
+      await Property.updateOne(
+        { _id: id },
+        { $pull: { sliderPhotos: { $in: sliderPhotos } } }
+      );
     }
 
-    await Property.updateOne(
-      { _id: id },
-      { $pull: { sliderPhotos: { $in: sliderPhotos } } }
-    );
+    if (Array.isArray(floorPlanUpload) && floorPlanUpload.length > 0) {
+      for (const image of floorPlanUpload) {
+        await deleteFromCloudinary(image);
+      }
+      await Property.updateOne(
+        { _id: id },
+        { $pull: { floorPlanUpload: { $in: floorPlanUpload } } }
+      );
+    }
+
+    if (Array.isArray(propertyDocuments) && propertyDocuments.length > 0) {
+      for (const image of propertyDocuments) {
+        await deleteFromCloudinary(image);
+      }
+      await Property.updateOne(
+        { _id: id },
+        { $pull: { propertyDocuments: { $in: propertyDocuments } } }
+      );
+    }
+
+    if (mainPhoto && typeof mainPhoto === "string") {
+      await deleteFromCloudinary(mainPhoto);
+      await Property.updateOne({ _id: id }, { $unset: { mainPhoto: "" } });
+    }
 
     return res
       .status(200)
-      .json({ success: true, message: "Slider images removed successfully" });
+      .json({ success: true, message: "Images removed successfully" });
   } catch (error) {
     console.error(error);
     res
@@ -1646,7 +1649,7 @@ module.exports = {
   getPropertyById,
   updateProperty,
   uploadNewSliderPhoto,
-  removeSliderImages,
+  removePropertyImages,
   deleteProperty,
   addReview,
   createAppointment,

@@ -22,7 +22,6 @@ router.get(
 );
 router.put(
   "/updateProperty/:id",
-  upload.single("mainPhoto"),
   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.updateProperty
 );
@@ -33,9 +32,9 @@ router.put(
   propertyController.uploadNewSliderPhoto
 );
 router.post(
-  "/removeSliderImages",
+  "/removePropertyImages",
   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
-  propertyController.removeSliderImages
+  propertyController.removePropertyImages
 );
 router.delete(
   "/deleteProperty/:id",
