@@ -2,33 +2,45 @@ const jwt = require("jsonwebtoken");
 const UserModel = require("../models/user.model");
 const UserToken = require("../models/token.model");
 
-const auth =
-  (requiredRoles = [], isPublic = false) =>
-  async (req, res, next) => {
+const auth = (requiredRoles = [], isPublic = false) => {
+  return async (req, res, next) => {
     try {
-      let token = req.headers.authorization;
+      const token = req.headers.authorization;
+
       if (!token) {
-        return res
-          .status(401)
-          .json({ message: "Unauthorized user", success: false });
+        return res.status(401).json({
+          message: "Unauthorized: No token provided",
+          success: false,
+        });
       }
+
+      const secretKey = isPublic
+        ? process.env.ACCESS_TOKEN_PUBLIC_KEY
+        : process.env.ACCESS_TOKEN_PRIVATE_KEY;
 
       let decoded;
-      if (isPublic) {
-        decoded = jwt.verify(token, process.env.ACCESS_TOKEN_PUBLIC_KEY);
-      } else {
-        decoded = jwt.verify(token, process.env.ACCESS_TOKEN_PRIVATE_KEY);
+      try {
+        decoded = jwt.verify(token, secretKey);
+      } catch (err) {
+        return res.status(401).json({
+          message: "Invalid or expired token",
+          success: false,
+        });
       }
 
-      const user = await UserModel.findOne({ _id: decoded.id });
-      const userToken = await UserToken.findOne({
-        $and: [{ userId: decoded.id }, { accessToken: token }],
-      });
+      const [user, userToken] = await Promise.all([
+        UserModel.findById(decoded.id),
+        UserToken.findOne({
+          userId: decoded.id,
+          accessToken: token,
+        }),
+      ]);
 
       if (!user || !userToken) {
-        return res
-          .status(401)
-          .json({ message: "Authentication failed", success: false });
+        return res.status(401).json({
+          message: "Authentication failed",
+          success: false,
+        });
       }
 
       if (requiredRoles.length > 0) {
@@ -50,10 +62,13 @@ const auth =
 
       next();
     } catch (err) {
-      return res
-        .status(401)
-        .json({ message: err.message || "Unauthorized user", success: false });
+      console.error("Auth Middleware Error:", err);
+      return res.status(500).json({
+        message: "Internal Server Error",
+        success: false,
+      });
     }
   };
+};
 
 module.exports = auth;

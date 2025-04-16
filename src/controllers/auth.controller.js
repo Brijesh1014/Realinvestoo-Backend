@@ -32,12 +32,10 @@ const register = async (req, res) => {
 
     const existingUser = await User_Model.findOne({ email });
     if (existingUser) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "User already exists with that email",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "User already exists with that email",
+      });
     }
 
     if (!email || !password) {
@@ -70,10 +68,28 @@ const register = async (req, res) => {
     });
 
     await newUser.save();
+
+    const {
+      accessToken,
+      refreshToken,
+      accessTokenExpiry,
+      refreshTokenExpiry,
+    } = await generateTokens(
+      email,
+      newUser._id,
+      newUser.isAdmin,
+      newUser.isAgent,
+      newUser.isEmp
+    );
+
     res.status(201).json({
       success: true,
-      data: newUser,
       message: "User registered successfully",
+      data: newUser,
+      accessToken,
+      accessTokenExpiry,
+      refreshToken,
+      refreshTokenExpiry,
     });
   } catch (err) {
     console.error(err);
@@ -110,7 +126,7 @@ const login = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Login successful",
+      message: "Login successfully",
       data: user,
       accessToken,
       accessTokenExpiry,
