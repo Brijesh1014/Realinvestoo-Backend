@@ -399,7 +399,8 @@ const getPropertyById = async (req, res) => {
     const property = await Property.findById(req.params.id)
       .populate("propertyType")
       .populate("listingType")
-      .populate("amenities");
+      .populate("amenities")
+      .populate("createdBy")
 
     if (!property) {
       return res.status(404).json({

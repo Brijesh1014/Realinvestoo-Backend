@@ -120,7 +120,8 @@ const getUserLikedProperties = async (req, res) => {
     const properties = await Property.find({ _id: { $in: likedPropertyIds } })
       .skip(skip)
       .limit(pageSize)
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .populate("listingType")
 
     properties.forEach((property) => {
       property._doc.isLike = userLikesMap[property._id.toString()] || false;
