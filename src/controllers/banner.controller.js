@@ -33,33 +33,11 @@ const createBanner = async (req, res) => {
 
 const getAllBanners = async (req, res) => {
   try {
-    let { page = 1, limit = 10 } = req.query;
-
-    page = parseInt(page);
-    limit = parseInt(limit);
-
-    const skip = (page - 1) * limit;
-
-    const totalBanners = await Banner.countDocuments();
-    const banners = await Banner.find()
-      .populate("createdBy", "name email")
-      .skip(skip)
-      .limit(limit);
-    const totalPages = Math.ceil(totalBanners / limit);
-
-    const remainingPages = totalPages - page > 0 ? totalPages - page : 0;
-
+    const banners = await Banner.find().populate("createdBy", "name email");
     res.status(200).json({
       success: true,
       message: "Get all banners successfully",
       data: banners,
-      meta: {
-        totalBanners,
-        currentPage: page,
-        totalPages,
-        remainingPages,
-        pageSize: banners.length,
-      },
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -77,9 +55,11 @@ const getBannerById = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Banner not found" });
 
-    res
-      .status(200)
-      .json({ success: true, message: "Get Banner successfully", data: banner });
+    res.status(200).json({
+      success: true,
+      message: "Get Banner successfully",
+      data: banner,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
