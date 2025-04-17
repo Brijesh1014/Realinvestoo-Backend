@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const UserToken = require("../models/token.model");
+require("dotenv").config();
 
 const generateTokens = async (email, userId, isAdmin, isAgent, isSeller, isBuyer) => {
   try {
