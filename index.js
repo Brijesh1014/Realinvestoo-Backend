@@ -23,6 +23,7 @@ const messageRoutes = require("./src/routes/message.route");
 const notificationRoute = require("./src/routes/notification.route");
 const amenitiesRoute = require("./src/routes/amenities.route");
 const bannerRoute = require("./src/routes/banner.route")
+const cmsPageRoute = require("./src/routes/cmsPage.route")
 const initSocketIo = require("./src/services/socket.service");
 
 app.set("view engine", "ejs");
@@ -59,6 +60,7 @@ app.use("/message", messageRoutes);
 app.use("/notification", notificationRoute);
 app.use("/",amenitiesRoute)
 app.use("/banner", bannerRoute);
+app.use("/cmsPage", cmsPageRoute);
 const server = app.listen(PORT, () => {
   console.log(`Server up and running on port ${PORT}!`);
 });
