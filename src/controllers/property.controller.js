@@ -241,10 +241,10 @@ const getAllProperties = async (req, res) => {
       query.propertySize = { $gte: minSize || 0, $lte: maxSize || 1000000 };
     }
 
-    if (bedrooms) query.bedroom = { $gte: bedrooms };
-    if (bathrooms) query.bathroom = { $gte: bathrooms };
-    if (kitchen) query.kitchen = { $gte: kitchen };
-    if (parking) query.parking = { $gte: parking };
+    if (bedrooms) query.bedroom = bedrooms;
+    if (bathrooms) query.bathroom = bathrooms;
+    if (kitchen) query.kitchen = kitchen;
+    if (parking) query.parking = parking;
 
     if (search) {
       query.$or = [
@@ -400,7 +400,7 @@ const getPropertyById = async (req, res) => {
       .populate("propertyType")
       .populate("listingType")
       .populate("amenities")
-      .populate("createdBy")
+      .populate("createdBy");
 
     if (!property) {
       return res.status(404).json({
