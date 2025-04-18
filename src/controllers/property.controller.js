@@ -179,6 +179,8 @@ const getAllProperties = async (req, res) => {
       state,
       city,
       furnishingStatus,
+      legalStatus,
+      ownershipStatus
     } = req.query;
 
     const query = {};
@@ -234,6 +236,8 @@ const getAllProperties = async (req, res) => {
     }
 
     if (bedrooms) query.bedroom = bedrooms;
+    if (legalStatus) query.legalStatus = legalStatus;
+    if (ownershipStatus) query.ownershipStatus = ownershipStatus;
     if (bathrooms) query.bathroom = bathrooms;
     if (kitchen) query.kitchen = kitchen;
     if (parking) query.parking = parking;
