@@ -190,13 +190,10 @@ const getAllProperties = async (req, res) => {
       if (propertyTypeDoc) {
         query.propertyType = propertyTypeDoc._id;
       } else {
-        return res.status(400).json({
-          success: false,
-          message: `Property type "${type}" not found`,
-        });
+        query._id = { $in: [] }; 
       }
     }
-
+    
     if (listingType) {
       const propertyListingTypeDoc = await PropertyListingType.findOne({
         name: listingType,
@@ -204,19 +201,16 @@ const getAllProperties = async (req, res) => {
       if (propertyListingTypeDoc) {
         query.listingType = propertyListingTypeDoc._id;
       } else {
-        return res.status(400).json({
-          success: false,
-          message: `Property Listing type "${listingType}" not found`,
-        });
+        query._id = { $in: [] };
       }
     }
-
+    
     if (amenities) {
       const amenityIds = amenities.split(",").map((a) => a.trim());
       const isValidObjectIds = amenityIds.every((id) =>
         /^[a-f\d]{24}$/i.test(id)
       );
-
+    
       if (isValidObjectIds) {
         query.amenities = { $all: amenityIds };
       } else {
@@ -225,13 +219,11 @@ const getAllProperties = async (req, res) => {
           const ids = amenityDocs.map((doc) => doc._id);
           query.amenities = { $all: ids };
         } else {
-          return res.status(400).json({
-            success: false,
-            message: "No matching amenities found.",
-          });
+          query._id = { $in: [] };
         }
       }
     }
+    
 
     if (minPrice || maxPrice) {
       query.price = { $gte: minPrice || 0, $lte: maxPrice || 1000000 };
