@@ -3,10 +3,12 @@ const router = express.Router();
 
 const amenitiesController = require("../controllers/amenities.controller");
 const auth = require("../middlewares/auth.middleware");
+const upload = require("../services/multer.service");
 
 router.post(
   "/property/createAmenities",
   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
+  upload.single("image"),
   amenitiesController.createAmenities
 );
 router.get(
@@ -23,6 +25,7 @@ router.get(
 router.put(
   "/property/updateAmenities/:id",
   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
+  upload.single("image"),
   amenitiesController.updateAmenities
 );
 router.delete(
