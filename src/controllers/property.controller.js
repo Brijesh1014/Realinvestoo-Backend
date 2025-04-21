@@ -338,6 +338,7 @@ const getAllProperties = async (req, res) => {
       .limit(pageSize)
       .populate("propertyType")
       .populate("listingType")
+      .populate("agent")
       .populate("amenities")
       .sort({ createdAt: -1 });
 
@@ -389,6 +390,7 @@ const getPropertyById = async (req, res) => {
     const property = await Property.findById(req.params.id)
       .populate("propertyType")
       .populate("listingType")
+      .populate("agent")
       .populate("amenities")
       .populate("createdBy");
 
