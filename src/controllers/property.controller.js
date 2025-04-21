@@ -188,7 +188,7 @@ const getAllProperties = async (req, res) => {
     if (location) query.address = { $regex: location, $options: "i" };
 
     if (type) {
-      const propertyTypeDoc = await PropertyType.findOne({ name: type });
+      const propertyTypeDoc = await PropertyType.findOne({ name: new RegExp(`^${type}$`, 'i') });
       if (propertyTypeDoc) {
         query.propertyType = propertyTypeDoc._id;
       } else {
@@ -198,7 +198,7 @@ const getAllProperties = async (req, res) => {
     
     if (listingType) {
       const propertyListingTypeDoc = await PropertyListingType.findOne({
-        name: listingType,
+        name: new RegExp(`^${listingType}$`, 'i')
       });
       if (propertyListingTypeDoc) {
         query.listingType = propertyListingTypeDoc._id;
@@ -208,15 +208,19 @@ const getAllProperties = async (req, res) => {
     }
     
     if (amenities) {
-      const amenityIds = amenities.split(",").map((a) => a.trim());
-      const isValidObjectIds = amenityIds.every((id) =>
+      const amenityInputs = amenities.split(",").map((a) => a.trim());
+    
+      const isValidObjectIds = amenityInputs.every((id) =>
         /^[a-f\d]{24}$/i.test(id)
       );
     
       if (isValidObjectIds) {
-        query.amenities = { $all: amenityIds };
+        query.amenities = { $all: amenityInputs };
       } else {
-        const amenityDocs = await Amenities.find({ name: { $in: amenityIds } });
+        const regexArray = amenityInputs.map((name) => new RegExp(`^${name}$`, 'i'));
+    
+        const amenityDocs = await Amenities.find({ name: { $in: regexArray } });
+    
         if (amenityDocs.length) {
           const ids = amenityDocs.map((doc) => doc._id);
           query.amenities = { $all: ids };
@@ -225,6 +229,7 @@ const getAllProperties = async (req, res) => {
         }
       }
     }
+    
     
 
     if (minPrice || maxPrice) {
@@ -305,19 +310,8 @@ const getAllProperties = async (req, res) => {
     if (state) query.state = { $regex: state, $options: "i" };
     if (city) query.city = { $regex: city, $options: "i" };
 
-    const validFurnishingStatuses = [
-      "Furnished",
-      "Semi-Furnished",
-      "Unfurnished",
-    ];
     if (furnishingStatus) {
-      if (!validFurnishingStatuses.includes(furnishingStatus)) {
-        return res.status(400).json({
-          success: false,
-          message: `Invalid furnishing status: "${furnishingStatus}"`,
-        });
-      }
-      query.furnishingStatus = furnishingStatus;
+      query.furnishingStatus ={ $regex: furnishingStatus, $options: "i" };
     }
 
     const pageNumber = parseInt(page);
