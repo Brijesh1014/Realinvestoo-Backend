@@ -81,7 +81,7 @@ const propertySchema = new mongoose.Schema(
     sliderPhotos: { type: [String] },
     floorPlanUpload: { type: [String] },
     propertyDocuments: { type: [String] },
-    viewCount:{type:Number},
+    viewCount:{type:Number,default:0},
     status: { type: String },
   },
   { timestamps: true }
