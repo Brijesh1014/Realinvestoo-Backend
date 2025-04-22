@@ -11,6 +11,7 @@ const FCMService = require("../services/notification.service");
 const PropertyListingType = require("../models/propertyListingType.model");
 const PropertyType = require("../models/propertyType.model");
 const Amenities = require("../models/amenities.model");
+const PropertyView = require("../models/propertyViewCount.model");
 
 const createProperty = async (req, res) => {
   try {
@@ -180,7 +181,7 @@ const getAllProperties = async (req, res) => {
       city,
       furnishingStatus,
       legalStatus,
-      ownershipStatus
+      ownershipStatus,
     } = req.query;
 
     const query = {};
@@ -188,17 +189,19 @@ const getAllProperties = async (req, res) => {
     if (location) query.address = { $regex: location, $options: "i" };
 
     if (type) {
-      const propertyTypeDoc = await PropertyType.findOne({ name: new RegExp(`^${type}$`, 'i') });
+      const propertyTypeDoc = await PropertyType.findOne({
+        name: new RegExp(`^${type}$`, "i"),
+      });
       if (propertyTypeDoc) {
         query.propertyType = propertyTypeDoc._id;
       } else {
-        query._id = { $in: [] }; 
+        query._id = { $in: [] };
       }
     }
-    
+
     if (listingType) {
       const propertyListingTypeDoc = await PropertyListingType.findOne({
-        name: new RegExp(`^${listingType}$`, 'i')
+        name: new RegExp(`^${listingType}$`, "i"),
       });
       if (propertyListingTypeDoc) {
         query.listingType = propertyListingTypeDoc._id;
@@ -206,21 +209,23 @@ const getAllProperties = async (req, res) => {
         query._id = { $in: [] };
       }
     }
-    
+
     if (amenities) {
       const amenityInputs = amenities.split(",").map((a) => a.trim());
-    
+
       const isValidObjectIds = amenityInputs.every((id) =>
         /^[a-f\d]{24}$/i.test(id)
       );
-    
+
       if (isValidObjectIds) {
         query.amenities = { $all: amenityInputs };
       } else {
-        const regexArray = amenityInputs.map((name) => new RegExp(`^${name}$`, 'i'));
-    
+        const regexArray = amenityInputs.map(
+          (name) => new RegExp(`^${name}$`, "i")
+        );
+
         const amenityDocs = await Amenities.find({ name: { $in: regexArray } });
-    
+
         if (amenityDocs.length) {
           const ids = amenityDocs.map((doc) => doc._id);
           query.amenities = { $all: ids };
@@ -229,8 +234,6 @@ const getAllProperties = async (req, res) => {
         }
       }
     }
-    
-    
 
     if (minPrice || maxPrice) {
       query.price = { $gte: minPrice || 0, $lte: maxPrice || 1000000 };
@@ -311,7 +314,7 @@ const getAllProperties = async (req, res) => {
     if (city) query.city = { $regex: city, $options: "i" };
 
     if (furnishingStatus) {
-      query.furnishingStatus ={ $regex: furnishingStatus, $options: "i" };
+      query.furnishingStatus = { $regex: furnishingStatus, $options: "i" };
     }
 
     const pageNumber = parseInt(page);
@@ -402,6 +405,21 @@ const getPropertyById = async (req, res) => {
     }
 
     if (req.userId) {
+      const existingView = await PropertyView.findOne({
+        userId: req.userId,
+        propertyId: property._id,
+      });
+
+      if (!existingView) {
+        await PropertyView.create({
+          userId: req.userId,
+          propertyId: property._id,
+        });
+
+        property.viewCount = (property.viewCount || 0) + 1;
+        await property.save();
+      }
+
       const userLike = await Likes.findOne({
         userId: req.userId,
         propertyId: property._id,
