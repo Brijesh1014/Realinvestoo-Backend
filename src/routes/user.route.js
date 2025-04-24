@@ -15,6 +15,12 @@ router.put(
   auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   userController.editProfile
 );
+router.patch(
+  "/uploadDocument",
+  upload.single("document"),
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
+  userController.uploadDocument
+);
 router.get(
   "/getUserById/:id",
   auth(["isBuyer", "isAdmin", "isSeller"]),

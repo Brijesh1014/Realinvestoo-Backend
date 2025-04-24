@@ -1,5 +1,7 @@
 const User_Model = require("../models/user.model");
+const Property_Model = require("../models/property.model");
 const { cloudinary } = require("../services/cloudinary.service");
+const FCMService = require("../services/notification.service");
 
 const getAllUsers = async (req, res) => {
   try {
@@ -76,21 +78,24 @@ const getAllUsers = async (req, res) => {
 
 const deleteUser = async (req, res) => {
   try {
-    const user = await User_Model.findById(req.params.id);
+    const id = req.params.id;
+    const user = await User_Model.findById(id);
+
     if (!user) {
       return res.status(404).json({
         success: false,
         message: "User not found",
       });
     }
+
     if (user.profileImage) {
-      const profileImagePublicId = user.profileImage
-        .split("/")
-        .pop()
-        .split(".")[0];
+      const profileImagePublicId = user.profileImage.split("/").pop().split(".")[0];
       await cloudinary.uploader.destroy(profileImagePublicId);
     }
-    await User_Model.findByIdAndDelete(req.params.id);
+
+    await Property_Model.deleteMany({ createdBy: id });
+    await User_Model.findByIdAndDelete(id);
+
     return res.status(200).json({
       success: true,
       message: "User deleted successfully",
@@ -123,8 +128,48 @@ const fetchAllUsers = async (req, res) => {
   }
 };
 
+const approveUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    const user = await User_Model.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    if (user.isApproved) {
+      return res.status(400).json({ success: false, message: "User is already approved" });
+    }
+
+    if (user.isAdmin) {
+      return res.status(400).json({ success: false, message: "Admin cannot be approved" });
+    }
+
+    user.isApproved = true;
+    await user.save();
+
+    const message = `Your account has been approved! You can now add properties.`;
+    await FCMService.sendNotificationToUser(user._id, 'Account Approved', message);
+
+    return res.status(200).json({
+      success: true,
+      message: "User approved successfully",
+      data: user,
+    });
+  } catch (error) {
+    console.error("Error approving user:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to approve user",
+      error: error.message,
+    });
+  }
+};
+
+
 module.exports = {
   getAllUsers,
   deleteUser,
   fetchAllUsers,
+  approveUser
 };

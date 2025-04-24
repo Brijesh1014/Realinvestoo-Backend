@@ -16,6 +16,11 @@ router.get(
   propertyController.getAllProperties
 );
 router.get(
+  "/getAllOwnProperties",
+  auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
+  propertyController.getAllOwnProperties
+);
+router.get(
   "/getPropertyById/:id",
   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.getPropertyById

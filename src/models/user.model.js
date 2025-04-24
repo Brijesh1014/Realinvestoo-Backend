@@ -72,6 +72,19 @@ const User = new Schema(
     },
     dob:{
       type: Date,
+    },
+    phoneNumber: {
+      type: Number,
+    },
+    countryCode: {
+      type: String,
+    },
+    document:{
+      type: String,
+    },
+    isApproved:{
+      type: Boolean,
+      default: false,
     }
   },
   { timestamps: true }

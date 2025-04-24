@@ -41,6 +41,7 @@ const createProperty = async (req, res) => {
     if (!state) missingFields.push("state");
     if (!city) missingFields.push("city");
     if (!zipcode) missingFields.push("zipcode");
+    if (!amenities) missingFields.push("amenities");
 
     if (missingFields.length > 0) {
       return res.status(400).json({
@@ -96,7 +97,7 @@ const createProperty = async (req, res) => {
 
     const senderId = req.userId;
     const message = `Check out the latest property: ${propertyDetails.propertyName}`;
-    await FCMService.sendNotificationToAllUsers(
+    await FCMService.sendNotificationToAdmin(
       senderId,
       propertyDetails.propertyName,
       message
@@ -314,7 +315,10 @@ const getAllProperties = async (req, res) => {
     if (city) query.city = { $regex: city, $options: "i" };
 
     if (furnishingStatus) {
-      query.furnishingStatus = { $regex: furnishingStatus, $options: "i" };
+      query.furnishingStatus = {
+        $regex: `^${furnishingStatus}$`,
+        $options: "i",
+      };
     }
 
     const pageNumber = parseInt(page);
@@ -341,6 +345,250 @@ const getAllProperties = async (req, res) => {
       .limit(pageSize)
       .populate("propertyType")
       .populate("listingType")
+      .populate("createdBy")
+      .populate("agent")
+      .populate("amenities")
+      .sort({ createdAt: -1 });
+
+    if (req.userId) {
+      const userLikes = await Likes.find({ userId: req.userId }).select(
+        "propertyId isLike"
+      );
+      const userLikesMap = {};
+      userLikes.forEach((like) => {
+        userLikesMap[like.propertyId.toString()] = like.isLike;
+      });
+
+      properties.forEach((property) => {
+        property._doc.isLike = userLikesMap[property._id.toString()] || false;
+      });
+    }
+
+    const totalPages = Math.ceil(totalProperties / pageSize);
+    const remainingPages =
+      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
+
+    return res.status(200).json({
+      success: true,
+      message: "Get all properties successful",
+      data: properties,
+      meta: {
+        totalProperties,
+        saleProperties,
+        rentProperties,
+        vacantProperties,
+        currentPage: pageNumber,
+        totalPages,
+        remainingPages,
+        pageSize: properties.length,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve properties",
+      error: error.message,
+    });
+  }
+};
+const getAllOwnProperties = async (req, res) => {
+  try {
+    const {
+      location,
+      type,
+      minPrice,
+      maxPrice,
+      minSize,
+      maxSize,
+      bedrooms,
+      bathrooms,
+      kitchen,
+      parking,
+      amenities,
+      search,
+      topRated,
+      bestOffer,
+      upcoming,
+      recommended,
+      timeFilter,
+      isFeatured,
+      page = 1,
+      limit = 10,
+      rentOrSale,
+      isLike,
+      listingType,
+      country,
+      state,
+      city,
+      furnishingStatus,
+      legalStatus,
+      ownershipStatus,
+    } = req.query;
+    const userId = req.userId
+
+    const query = {};
+
+    if (location) query.address = { $regex: location, $options: "i" };
+
+    if (type) {
+      const propertyTypeDoc = await PropertyType.findOne({
+        name: new RegExp(`^${type}$`, "i"),
+      });
+      if (propertyTypeDoc) {
+        query.propertyType = propertyTypeDoc._id;
+      } else {
+        query._id = { $in: [] };
+      }
+    }
+
+    if (listingType) {
+      const propertyListingTypeDoc = await PropertyListingType.findOne({
+        name: new RegExp(`^${listingType}$`, "i"),
+      });
+      if (propertyListingTypeDoc) {
+        query.listingType = propertyListingTypeDoc._id;
+      } else {
+        query._id = { $in: [] };
+      }
+    }
+
+    if (amenities) {
+      const amenityInputs = amenities.split(",").map((a) => a.trim());
+
+      const isValidObjectIds = amenityInputs.every((id) =>
+        /^[a-f\d]{24}$/i.test(id)
+      );
+
+      if (isValidObjectIds) {
+        query.amenities = { $all: amenityInputs };
+      } else {
+        const regexArray = amenityInputs.map(
+          (name) => new RegExp(`^${name}$`, "i")
+        );
+
+        const amenityDocs = await Amenities.find({ name: { $in: regexArray } });
+
+        if (amenityDocs.length) {
+          const ids = amenityDocs.map((doc) => doc._id);
+          query.amenities = { $all: ids };
+        } else {
+          query._id = { $in: [] };
+        }
+      }
+    }
+
+    if (minPrice || maxPrice) {
+      query.price = { $gte: minPrice || 0, $lte: maxPrice || 1000000 };
+    }
+
+    if (minSize || maxSize) {
+      query.propertySize = { $gte: minSize || 0, $lte: maxSize || 1000000 };
+    }
+
+    if (bedrooms) query.bedroom = bedrooms;
+    if (legalStatus) query.legalStatus = legalStatus;
+    if (ownershipStatus) query.ownershipStatus = ownershipStatus;
+    if (bathrooms) query.bathroom = bathrooms;
+    if (kitchen) query.kitchen = kitchen;
+    if (parking) query.parking = parking;
+
+    if (search) {
+      query.$or = [
+        { propertyName: { $regex: search, $options: "i" } },
+        { details: { $regex: search, $options: "i" } },
+        { address: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    if (topRated) query.ratings = { $gte: 4 };
+    if (bestOffer) query.bestOffer = true;
+    if (upcoming) query.new = true;
+    if (recommended) query.recommended = true;
+
+    if (isFeatured === "true") query.featured = true;
+    else if (isFeatured === "false") query.featured = false;
+
+    switch (rentOrSale) {
+      case "Rent":
+        query.rentOrSale = "Rent";
+        break;
+      case "Sale":
+        query.rentOrSale = "Sale";
+        break;
+      case "PG":
+        query.rentOrSale = "PG";
+        break;
+    }
+
+    if (timeFilter) {
+      const now = new Date();
+      let startDate;
+      switch (timeFilter) {
+        case "week":
+          startDate = new Date(now.setDate(now.getDate() - 7));
+          break;
+        case "month":
+          startDate = new Date(now.setMonth(now.getMonth() - 1));
+          break;
+        case "year":
+          startDate = new Date(now.setFullYear(now.getFullYear() - 1));
+          break;
+      }
+      if (startDate) query.createdAt = { $gte: startDate };
+    }
+
+    if (req.userId && isLike) {
+      const userLikes = await Likes.find({
+        userId: req.userId,
+        isLike: true,
+      }).select("propertyId");
+
+      const likedPropertyIds = userLikes.map((like) => like.propertyId);
+      if (isLike === "true") {
+        query._id = { $in: likedPropertyIds };
+      } else if (isLike === "false") {
+        query._id = { $nin: likedPropertyIds };
+      }
+    }
+
+    if (country) query.country = { $regex: country, $options: "i" };
+    if (state) query.state = { $regex: state, $options: "i" };
+    if (city) query.city = { $regex: city, $options: "i" };
+
+    if (furnishingStatus) {
+      query.furnishingStatus = {
+        $regex: `^${furnishingStatus}$`,
+        $options: "i",
+      };
+    }
+
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
+
+    const totalProperties = await Property.countDocuments(query);
+    const saleProperties = await Property.countDocuments({
+      ...query,
+      rentOrSale: "Sale",
+    });
+    const rentProperties = await Property.countDocuments({
+      ...query,
+      rentOrSale: "Rent",
+    });
+    const vacantProperties = await Property.countDocuments({
+      ...query,
+      rentOrSale: { $ne: "Sale" },
+      visible: true,
+    });
+    query.createdBy = userId;
+
+    const properties = await Property.find(query)
+      .skip(skip)
+      .limit(pageSize)
+      .populate("propertyType")
+      .populate("listingType")
+      .populate("createdBy")
       .populate("agent")
       .populate("amenities")
       .sort({ createdAt: -1 });
@@ -1683,4 +1931,5 @@ module.exports = {
   getPropertyTypeById,
   uploadFile,
   deleteFile,
+  getAllOwnProperties
 };

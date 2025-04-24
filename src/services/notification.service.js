@@ -88,6 +88,44 @@ const FCMService = {
       );
     }
   },
+
+  sendNotificationToAdmin: async (senderId, name, message) => {
+    try {
+      const admins = await User.find({ isAdmin: true, fcmToken: { $exists: true, $ne: null } });
+  
+      if (admins.length === 0) {
+        console.log('No admin users with FCM tokens found.');
+        return;
+      }
+  
+      const tokens = admins.map(admin => admin.fcmToken);
+      const recipientIds = admins.map(admin => admin._id);
+  
+      const messagePayload = {
+        notification: { name, body: message },
+      };
+  
+      const response = await admin.messaging().sendMulticast({
+        tokens,
+        ...messagePayload,
+      });
+  
+      await Notification.create({
+        name,
+        message,
+        senderId,
+        recipients: recipientIds,
+        tokens,
+        successCount: response.successCount,
+        failureCount: response.failureCount,
+      });
+  
+      console.log(`Notification sent to ${response.successCount} admin(s)`);
+    } catch (error) {
+      console.error('Error sending notification to admins:', error);
+    }
+  },
+  
 };
 
 async function getAllUserTokens() {

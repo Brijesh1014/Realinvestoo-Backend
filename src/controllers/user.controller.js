@@ -3,6 +3,7 @@ const {
   uploadToCloudinary,
   cloudinary,
 } = require("../services/cloudinary.service");
+const FCMService = require("../services/notification.service");
 
 const getAllAgents = async (req, res) => {
   try {
@@ -60,7 +61,7 @@ const editProfile = async (req, res) => {
       isSeller,
       firstName,
       lastName,
-      dob
+      dob,
     } = req.body;
 
     if (!id) {
@@ -82,7 +83,7 @@ const editProfile = async (req, res) => {
       username,
       dob,
       firstName,
-      lastName
+      lastName,
     };
 
     let profileImageUrl;
@@ -125,17 +126,17 @@ const editProfile = async (req, res) => {
 
     if (req.isAdmin === true) {
       console.log("comes");
-      
+
       const roles = {
-        isAdmin: isAdmin === 'true' || isAdmin === true,
-        isAgent: isAgent === 'true' || isAgent === true,
-        isBuyer: isBuyer === 'true' || isBuyer === true,
-        isSeller: isSeller === 'true' || isSeller === true,
+        isAdmin: isAdmin === "true" || isAdmin === true,
+        isAgent: isAgent === "true" || isAgent === true,
+        isBuyer: isBuyer === "true" || isBuyer === true,
+        isSeller: isSeller === "true" || isSeller === true,
       };
-      
-      const providedRoles = Object.entries(roles)
-        .filter(([_, value]) => Boolean(value) === true); 
-      
+
+      const providedRoles = Object.entries(roles).filter(
+        ([_, value]) => Boolean(value) === true
+      );
 
       if (providedRoles.length > 1) {
         return res.status(400).json({
@@ -149,7 +150,9 @@ const editProfile = async (req, res) => {
 
         const userToUpdate = await User_Model.findById(id);
         if (!userToUpdate) {
-          return res.status(404).json({ success: false, message: "User not found" });
+          return res
+            .status(404)
+            .json({ success: false, message: "User not found" });
         }
 
         updateData = {
@@ -180,7 +183,6 @@ const editProfile = async (req, res) => {
       message: "Profile updated successfully",
       data: updatedProfile,
     });
-
   } catch (error) {
     console.error("Error updating profile:", error);
     return res.status(500).json({
@@ -190,10 +192,6 @@ const editProfile = async (req, res) => {
     });
   }
 };
-
-
-
-
 
 const getUserById = async (req, res) => {
   try {
@@ -216,11 +214,7 @@ const getUserById = async (req, res) => {
 
     const user = await User_Model.findOne({
       _id: id,
-      $or: [
-        { isSeller: true },
-        { isBuyer: true },
-        { isAgent: true },
-      ],
+      $or: [{ isSeller: true }, { isBuyer: true }, { isAgent: true }],
     });
 
     if (!user) {
@@ -245,8 +239,66 @@ const getUserById = async (req, res) => {
   }
 };
 
+const uploadDocument = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User_Model.findById(id);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    if (user.document) {
+      return res.status(400).json({
+        success: false,
+        message: "Document already uploaded",
+      });
+    }
+
+    let documentUrl = null;
+    if (req.file) {
+      documentUrl = await uploadToCloudinary(req.file);
+    }
+
+    if (!documentUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "No document file uploaded",
+      });
+    }
+
+    const senderId = req.userId;
+    const notificationMessage = `Approve or Decline the  ${user.name}`;
+
+    await FCMService.sendNotificationToAdmin(
+      senderId,
+      user.name,
+      notificationMessage
+    );
+
+    user.document = documentUrl;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Document uploaded successfully",
+      data: user,
+    });
+  } catch (error) {
+    console.error("Error uploading document:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to upload document",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllAgents,
   editProfile,
   getUserById,
+  uploadDocument,
 };

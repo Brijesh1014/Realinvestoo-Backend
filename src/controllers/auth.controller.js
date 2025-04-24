@@ -6,6 +6,7 @@ const { generateTokens } = require("../utils/generate.token");
 const dotenv = require("dotenv");
 const jwt = require("jsonwebtoken");
 const sendOtp = require("../services/sendOtp.service");
+const FCMService = require("../services/notification.service");
 dotenv.config();
 
 const register = async (req, res) => {
@@ -43,6 +44,14 @@ const register = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Please enter all required fields" });
     }
+
+    if (document) {
+      const senderId = req.userId;
+      const notificationMessage = `Approve or Decline the  ${name}`;
+    
+      await FCMService.sendNotificationToAdmin(senderId, name, notificationMessage);
+    }
+    
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
