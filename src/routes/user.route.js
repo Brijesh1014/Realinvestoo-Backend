@@ -16,7 +16,7 @@ router.put(
   userController.editProfile
 );
 router.patch(
-  "/uploadDocument",
+  "/uploadDocument/:id",
   upload.single("document"),
   auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   userController.uploadDocument

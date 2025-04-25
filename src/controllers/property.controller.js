@@ -43,6 +43,14 @@ const createProperty = async (req, res) => {
     if (!zipcode) missingFields.push("zipcode");
     if (!amenities) missingFields.push("amenities");
 
+    const user = await User.findById(req.userId);
+    if (!user || !user.isApproved) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not approved to create a property.",
+      });
+    }
+
     if (missingFields.length > 0) {
       return res.status(400).json({
         success: false,

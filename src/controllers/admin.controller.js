@@ -131,6 +131,12 @@ const fetchAllUsers = async (req, res) => {
 const approveUser = async (req, res) => {
   try {
     const userId = req.params.id;
+    const id = req.userId
+
+    const isAdmin = await User_Model.findById(id)
+    if(!isAdmin.isAdmin){
+      return res.status(404).json({ success: false, message: "Do not have permission" });
+    }
 
     const user = await User_Model.findById(userId);
     if (!user) {
@@ -139,6 +145,9 @@ const approveUser = async (req, res) => {
 
     if (user.isApproved) {
       return res.status(400).json({ success: false, message: "User is already approved" });
+    }
+    if (!user.document) {
+      return res.status(400).json({ success: false, message: "Document is not uploaded" });
     }
 
     if (user.isAdmin) {
@@ -149,7 +158,7 @@ const approveUser = async (req, res) => {
     await user.save();
 
     const message = `Your account has been approved! You can now add properties.`;
-    await FCMService.sendNotificationToUser(user._id, 'Account Approved', message);
+    await FCMService.sendNotificationToUser(id,user._id, 'Account Approved', message);
 
     return res.status(200).json({
       success: true,

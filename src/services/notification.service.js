@@ -88,10 +88,12 @@ const FCMService = {
       );
     }
   },
-
   sendNotificationToAdmin: async (senderId, name, message) => {
     try {
-      const admins = await User.find({ isAdmin: true, fcmToken: { $exists: true, $ne: null } });
+      const admins = await User.find({
+        isAdmin: true,
+        fcmToken: { $exists: true, $ne: null },
+      });
   
       if (admins.length === 0) {
         console.log('No admin users with FCM tokens found.');
@@ -99,16 +101,43 @@ const FCMService = {
       }
   
       const tokens = admins.map(admin => admin.fcmToken);
+  
       const recipientIds = admins.map(admin => admin._id);
   
-      const messagePayload = {
-        notification: { name, body: message },
-      };
+      if (!tokens || tokens.length === 0) {
+        console.log(`No FCM token found for user ${recipientIds}`);
+        return;
+      }
+
+      for (const token of tokens) {
+        const notificationMessage = {
+          token: token,
+          notification: {
+            title: name,
+            body: message,
+          },
+          webpush: {
+            headers: {
+              Urgency: 'high',
+            },
+            notification: {
+              icon: '/favicon.ico',
+              click_action: 'https://real-investoo-admin.vercel.app/dashboard', 
+            },
+          },
+        };
   
-      const response = await admin.messaging().sendMulticast({
-        tokens,
-        ...messagePayload,
-      });
+        try {
+          const response = await admin.messaging().send(notificationMessage);
+        } catch (error) {
+          console.error('Error sending notification:', error);
+        }
+      }
+  
+      const response = {
+        successCount: tokens.length,
+        failureCount: 0,  
+      };
   
       await Notification.create({
         name,
@@ -121,10 +150,13 @@ const FCMService = {
       });
   
       console.log(`Notification sent to ${response.successCount} admin(s)`);
+  
     } catch (error) {
       console.error('Error sending notification to admins:', error);
     }
-  },
+  }
+  
+   
   
 };
 

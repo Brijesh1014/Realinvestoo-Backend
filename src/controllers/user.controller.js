@@ -243,11 +243,16 @@ const uploadDocument = async (req, res) => {
   try {
     const { id } = req.params;
 
+    if (req.userId !== id) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to upload a document for this user",
+      });
+    }
+
     const user = await User_Model.findById(id);
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
     if (user.document) {
@@ -270,7 +275,7 @@ const uploadDocument = async (req, res) => {
     }
 
     const senderId = req.userId;
-    const notificationMessage = `Approve or Decline the  ${user.name}`;
+    const notificationMessage = `Please review and approve or decline the request for ${user.name}.`;
 
     await FCMService.sendNotificationToAdmin(
       senderId,
@@ -295,6 +300,7 @@ const uploadDocument = async (req, res) => {
     });
   }
 };
+
 
 module.exports = {
   getAllAgents,
