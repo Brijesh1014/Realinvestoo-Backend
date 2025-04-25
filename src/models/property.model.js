@@ -18,6 +18,7 @@ const propertySchema = new mongoose.Schema(
       ref: "PropertyListingType",
     },
     propertyId: { type: String },
+    propertiesFacing: { type: String },
     negotiable: { type: Boolean, default: false },
     dateOfListing: { type: Date, default: Date.now },
     builtUpArea: { type: Number },

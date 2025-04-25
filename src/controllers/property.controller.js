@@ -28,28 +28,18 @@ const createProperty = async (req, res) => {
       city,
       zipcode,
       amenities,
+      propertiesFacing 
     } = req.body;
     const missingFields = [];
     if (!propertyName) missingFields.push("propertyName");
     if (!propertyType) missingFields.push("propertyType");
     if (!listingType) missingFields.push("listingType");
-    if (!address) missingFields.push("address");
-    if (!price) missingFields.push("price");
-    if (!bedroom) missingFields.push("bedroom");
-    if (!bathroom) missingFields.push("bathroom");
     if (!country) missingFields.push("country");
     if (!state) missingFields.push("state");
     if (!city) missingFields.push("city");
     if (!zipcode) missingFields.push("zipcode");
     if (!amenities) missingFields.push("amenities");
 
-    const user = await User.findById(req.userId);
-    if (!user || !user.isApproved) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not approved to create a property.",
-      });
-    }
 
     if (missingFields.length > 0) {
       return res.status(400).json({
@@ -347,7 +337,15 @@ const getAllProperties = async (req, res) => {
       rentOrSale: { $ne: "Sale" },
       visible: true,
     });
+    const allowedUsers = await User_Model.find({
+      $or: [{ isAdmin: true }, { isAdmin: false, status: "Approved" }],
+    }).select("_id");
 
+    const allowedUserIds = allowedUsers.map((user) => user._id);
+    query.status = { $ne: "Draft" };
+
+
+    query.createdBy = { $in: allowedUserIds };
     const properties = await Property.find(query)
       .skip(skip)
       .limit(pageSize)
@@ -433,7 +431,7 @@ const getAllOwnProperties = async (req, res) => {
       legalStatus,
       ownershipStatus,
     } = req.query;
-    const userId = req.userId
+    const userId = req.userId;
 
     const query = {};
 
@@ -748,13 +746,21 @@ const updateProperty = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    const senderId = req.userId;
     const message = `The property "${property.propertyName}" has been updated. Check out the latest details!`;
-    await FCMService.sendNotificationToAllUsers(
-      senderId,
-      property.propertyName,
-      message
-    );
+
+    const likedUsers = await Likes.find({
+      propertyId: property._id,
+      isLike: true,
+    }).select("userId");
+
+    for (const like of likedUsers) {
+      await FCMService.sendNotificationToUser(
+        req.userId,
+        like.userId, 
+        property.propertyName, 
+        message 
+      );
+    }
 
     return res.status(200).json({
       success: true,
@@ -1939,5 +1945,5 @@ module.exports = {
   getPropertyTypeById,
   uploadFile,
   deleteFile,
-  getAllOwnProperties
+  getAllOwnProperties,
 };

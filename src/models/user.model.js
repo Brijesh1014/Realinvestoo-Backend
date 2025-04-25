@@ -82,10 +82,11 @@ const User = new Schema(
     document:{
       type: String,
     },
-    isApproved:{
-      type: Boolean,
-      default: false,
-    }
+    status: {
+      type: String,
+      enum: ["Pending", "Approved", "Rejected"],
+      default: "Pending",
+    },
   },
   { timestamps: true }
 );

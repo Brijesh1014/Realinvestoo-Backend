@@ -128,14 +128,19 @@ const fetchAllUsers = async (req, res) => {
   }
 };
 
-const approveUser = async (req, res) => {
+const updateUserStatus = async (req, res) => {
   try {
     const userId = req.params.id;
-    const id = req.userId
+    const adminId = req.userId;
+    const { status } = req.body; 
 
-    const isAdmin = await User_Model.findById(id)
-    if(!isAdmin.isAdmin){
-      return res.status(404).json({ success: false, message: "Do not have permission" });
+    if (!["Approved", "Rejected"].includes(status)) {
+      return res.status(400).json({ success: false, message: "Invalid status. Must be 'Approved' or 'Reject'" });
+    }
+
+    const adminUser = await User_Model.findById(adminId);
+    if (!adminUser?.isAdmin) {
+      return res.status(403).json({ success: false, message: "You do not have permission" });
     }
 
     const user = await User_Model.findById(userId);
@@ -143,33 +148,39 @@ const approveUser = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    if (user.isApproved) {
-      return res.status(400).json({ success: false, message: "User is already approved" });
-    }
-    if (!user.document) {
-      return res.status(400).json({ success: false, message: "Document is not uploaded" });
-    }
-
     if (user.isAdmin) {
-      return res.status(400).json({ success: false, message: "Admin cannot be approved" });
+      return res.status(400).json({ success: false, message: "Admin status cannot be updated" });
     }
 
-    user.isApproved = true;
+    if (user.status === status) {
+      return res.status(400).json({ success: false, message: `User is already ${status.toLowerCase()}` });
+    }
+
+    if (status === "Approved" && !user.document) {
+      return res.status(400).json({ success: false, message: "Document not uploaded" });
+    }
+
+    user.status = status;
     await user.save();
 
-    const message = `Your account has been approved! You can now add properties.`;
-    await FCMService.sendNotificationToUser(id,user._id, 'Account Approved', message);
+    let notificationTitle = `Account ${status}`;
+    let notificationMessage =
+      status === "Approved"
+        ? "Your account has been approved! You can now add properties."
+        : "Your account has been rejected. Please contact support or upload correct documents.";
+
+    await FCMService.sendNotificationToUser(adminId, user._id, notificationTitle, notificationMessage);
 
     return res.status(200).json({
       success: true,
-      message: "User approved successfully",
+      message: `User ${status.toLowerCase()} successfully`,
       data: user,
     });
   } catch (error) {
-    console.error("Error approving user:", error);
+    console.error("Error updating user status:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to approve user",
+      message: "Failed to update user status",
       error: error.message,
     });
   }
@@ -180,5 +191,5 @@ module.exports = {
   getAllUsers,
   deleteUser,
   fetchAllUsers,
-  approveUser
+  updateUserStatus
 };

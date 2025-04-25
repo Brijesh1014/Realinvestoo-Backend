@@ -12,7 +12,6 @@ dotenv.config();
 const register = async (req, res) => {
   try {
     const {
-      name,
       email,
       phoneNo,
       username,
@@ -52,7 +51,7 @@ const register = async (req, res) => {
     
       await FCMService.sendNotificationToAdmin(senderId, name, notificationMessage);
     }
-    
+    const name = firstName || lastName ? `${firstName || ""} ${lastName || ""}`.trim() : "";
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
@@ -75,6 +74,7 @@ const register = async (req, res) => {
       dob,
       firstName,
       lastName,
+      document
     });
 
     await newUser.save();
