@@ -353,15 +353,12 @@ const getAllProperties = async (req, res) => {
       rentOrSale: { $ne: "Sale" },
       visible: true,
     });
-    const allowedUsers = await User.find({
-      $or: [{ isAdmin: true }, { isAdmin: false, status: "Approved" }],
-    }).select("_id");
-
-    const allowedUserIds = allowedUsers.map((user) => user._id);
+    const approvedUsers = await User.find({  $or: [{ isAdmin: true }, { status: "Approved" }], }).select("_id");
+    const approvedUserIds = approvedUsers.map(user => user._id);
     query.status = { $ne: "Draft" };
+    
+    query.createdBy = { $in: approvedUserIds };
 
-
-    query.createdBy = { $in: allowedUserIds };
     const properties = await Property.find(query)
       .skip(skip)
       .limit(pageSize)
@@ -372,6 +369,7 @@ const getAllProperties = async (req, res) => {
       .populate("amenities")
       .sort({ createdAt: -1 });
 
+    
     if (req.userId) {
       const userLikes = await Likes.find({ userId: req.userId }).select(
         "propertyId isLike"
