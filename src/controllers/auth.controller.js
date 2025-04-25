@@ -29,6 +29,7 @@ const register = async (req, res) => {
       firstName,
       lastName,
       dob,
+      document
     } = req.body;
 
     const existingUser = await User_Model.findOne({ email });
