@@ -337,7 +337,7 @@ const getAllProperties = async (req, res) => {
       rentOrSale: { $ne: "Sale" },
       visible: true,
     });
-    const allowedUsers = await User_Model.find({
+    const allowedUsers = await User.find({
       $or: [{ isAdmin: true }, { isAdmin: false, status: "Approved" }],
     }).select("_id");
 
