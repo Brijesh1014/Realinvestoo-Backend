@@ -30,6 +30,7 @@ const createProperty = async (req, res) => {
       amenities,
       propertiesFacing 
     } = req.body;
+
     const missingFields = [];
     if (!propertyName) missingFields.push("propertyName");
     if (!propertyType) missingFields.push("propertyType");
@@ -40,6 +41,14 @@ const createProperty = async (req, res) => {
     if (!zipcode) missingFields.push("zipcode");
     if (!amenities) missingFields.push("amenities");
 
+    const user = await User.findById(req.userId);
+    if (user.isBuyer) {
+      return res.status(400).json({
+        success: false,
+        message: "Buyers are not allowed to create properties.",
+      });
+    }
+    
 
     if (missingFields.length > 0) {
       return res.status(400).json({
@@ -102,11 +111,17 @@ const createProperty = async (req, res) => {
     );
 
     const propertyData = await propertyDetails.save();
+
+
+    const isApproved = user.status === "Approved" || user.isAdmin;
     return res.status(201).json({
       success: true,
-      message: "Property created successfully",
+      message: isApproved
+        ? "Property created successfully"
+        : "Property created successfully, but it won't be listed as your account is not approved yet.",
       data: propertyData,
     });
+    
   } catch (error) {
     console.error("Error creating property: ", error);
     return res.status(500).json({
@@ -116,6 +131,7 @@ const createProperty = async (req, res) => {
     });
   }
 };
+
 
 const uploadFile = async (req, res) => {
   try {
