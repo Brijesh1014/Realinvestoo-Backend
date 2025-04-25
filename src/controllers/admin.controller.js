@@ -132,7 +132,7 @@ const updateUserStatus = async (req, res) => {
   try {
     const userId = req.params.id;
     const adminId = req.userId;
-    const { status } = req.body; 
+    const { status,reason } = req.body; 
 
     if (!["Approved", "Rejected"].includes(status)) {
       return res.status(400).json({ success: false, message: "Invalid status. Must be 'Approved' or 'Reject'" });
@@ -167,7 +167,10 @@ const updateUserStatus = async (req, res) => {
     let notificationMessage =
       status === "Approved"
         ? "Your account has been approved! You can now add properties."
-        : "Your account has been rejected. Please contact support or upload correct documents.";
+        : reason
+          ? `Your account has been rejected. Reason: ${user.reason}`
+          : "Your account has been rejected. Please contact support or upload correct documents.";
+    
 
     await FCMService.sendNotificationToUser(adminId, user._id, notificationTitle, notificationMessage);
 
@@ -187,9 +190,54 @@ const updateUserStatus = async (req, res) => {
 };
 
 
+const getPendingDocumentUsers = async (req, res) => {
+  try {
+    const { page = 1, pageSize = 10, status, search } = req.query;
+
+    const skip = (page - 1) * pageSize;
+    const query = {
+      status: "Pending",
+      document: { $exists: true, $ne: "" },
+    };
+
+    if (status) {
+      query.status = status; 
+    }
+
+    if (search) {
+      query.name = { $regex: search, $options: "i" };
+    }
+
+    const total = await User_Model.countDocuments(query);
+    const users = await User_Model.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(pageSize));
+
+    return res.status(200).json({
+      success: true,
+      message: "Users fetched successfully",
+      data: users,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize),
+      totalPages: Math.ceil(total / pageSize),
+      totalUsers: total,
+    });
+  } catch (err) {
+    console.error("Error fetching users:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+
+
 module.exports = {
   getAllUsers,
   deleteUser,
   fetchAllUsers,
-  updateUserStatus
+  updateUserStatus,
+  getPendingDocumentUsers
 };

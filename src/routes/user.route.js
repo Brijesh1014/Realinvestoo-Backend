@@ -16,14 +16,14 @@ router.put(
   userController.editProfile
 );
 router.patch(
-  "/uploadDocument/:id",
+  "/uploadDocument",
   upload.single("document"),
   auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   userController.uploadDocument
 );
 router.get(
   "/getUserById/:id",
-  auth(["isBuyer", "isAdmin", "isSeller"]),
+  auth(["isBuyer", "isAdmin", "isSeller","isAgent"]),
   userController.getUserById
 );
 module.exports = router;
