@@ -207,43 +207,28 @@ const getAllProperties = async (req, res) => {
       const propertyTypeDoc = await PropertyType.findOne({
         name: new RegExp(`^${type}$`, "i"),
       });
-      if (propertyTypeDoc) {
-        query.propertyType = propertyTypeDoc._id;
-      } else {
-        query._id = { $in: [] };
-      }
+      query.propertyType = propertyTypeDoc ? propertyTypeDoc._id : null;
+      if (!propertyTypeDoc) query._id = { $in: [] };
     }
 
     if (listingType) {
       const propertyListingTypeDoc = await PropertyListingType.findOne({
         name: new RegExp(`^${listingType}$`, "i"),
       });
-      if (propertyListingTypeDoc) {
-        query.listingType = propertyListingTypeDoc._id;
-      } else {
-        query._id = { $in: [] };
-      }
+      query.listingType = propertyListingTypeDoc ? propertyListingTypeDoc._id : null;
+      if (!propertyListingTypeDoc) query._id = { $in: [] };
     }
 
     if (amenities) {
       const amenityInputs = amenities.split(",").map((a) => a.trim());
-
-      const isValidObjectIds = amenityInputs.every((id) =>
-        /^[a-f\d]{24}$/i.test(id)
-      );
-
+      const isValidObjectIds = amenityInputs.every((id) => /^[a-f\d]{24}$/i.test(id));
       if (isValidObjectIds) {
         query.amenities = { $all: amenityInputs };
       } else {
-        const regexArray = amenityInputs.map(
-          (name) => new RegExp(`^${name}$`, "i")
-        );
-
+        const regexArray = amenityInputs.map((name) => new RegExp(`^${name}$`, "i"));
         const amenityDocs = await Amenities.find({ name: { $in: regexArray } });
-
         if (amenityDocs.length) {
-          const ids = amenityDocs.map((doc) => doc._id);
-          query.amenities = { $all: ids };
+          query.amenities = { $all: amenityDocs.map((doc) => doc._id) };
         } else {
           query._id = { $in: [] };
         }
@@ -251,19 +236,19 @@ const getAllProperties = async (req, res) => {
     }
 
     if (minPrice || maxPrice) {
-      query.price = { $gte: minPrice || 0, $lte: maxPrice || 1000000 };
+      query.price = { $gte: parseFloat(minPrice) || 0, $lte: parseFloat(maxPrice) || 1000000 };
     }
 
     if (minSize || maxSize) {
-      query.propertySize = { $gte: minSize || 0, $lte: maxSize || 1000000 };
+      query.propertySize = { $gte: parseFloat(minSize) || 0, $lte: parseFloat(maxSize) || 1000000 };
     }
 
     if (bedrooms) query.bedroom = bedrooms;
-    if (legalStatus) query.legalStatus = legalStatus;
-    if (ownershipStatus) query.ownershipStatus = ownershipStatus;
     if (bathrooms) query.bathroom = bathrooms;
     if (kitchen) query.kitchen = kitchen;
     if (parking) query.parking = parking;
+    if (legalStatus) query.legalStatus = legalStatus;
+    if (ownershipStatus) query.ownershipStatus = ownershipStatus;
 
     if (search) {
       query.$or = [
@@ -281,16 +266,8 @@ const getAllProperties = async (req, res) => {
     if (isFeatured === "true") query.featured = true;
     else if (isFeatured === "false") query.featured = false;
 
-    switch (rentOrSale) {
-      case "Rent":
-        query.rentOrSale = "Rent";
-        break;
-      case "Sale":
-        query.rentOrSale = "Sale";
-        break;
-      case "PG":
-        query.rentOrSale = "PG";
-        break;
+    if (rentOrSale) {
+      query.rentOrSale = rentOrSale;
     }
 
     if (timeFilter) {
@@ -315,7 +292,6 @@ const getAllProperties = async (req, res) => {
         userId: req.userId,
         isLike: true,
       }).select("propertyId");
-
       const likedPropertyIds = userLikes.map((like) => like.propertyId);
       if (isLike === "true") {
         query._id = { $in: likedPropertyIds };
@@ -335,10 +311,21 @@ const getAllProperties = async (req, res) => {
       };
     }
 
+    // ✅ Add user status + visibility filter BEFORE count
+    const approvedUsers = await User.find({
+      $or: [{ isAdmin: true }, { status: "Approved" }],
+    }).select("_id");
+    const approvedUserIds = approvedUsers.map((user) => user._id);
+
+    query.status = { $ne: "Draft" };
+    query.createdBy = { $in: approvedUserIds };
+
+    // ✅ Pagination setup
     const pageNumber = parseInt(page);
     const pageSize = parseInt(limit);
     const skip = (pageNumber - 1) * pageSize;
 
+    // ✅ Accurate counts using final query
     const totalProperties = await Property.countDocuments(query);
     const saleProperties = await Property.countDocuments({
       ...query,
@@ -353,11 +340,6 @@ const getAllProperties = async (req, res) => {
       rentOrSale: { $ne: "Sale" },
       visible: true,
     });
-    const approvedUsers = await User.find({  $or: [{ isAdmin: true }, { status: "Approved" }], }).select("_id");
-    const approvedUserIds = approvedUsers.map(user => user._id);
-    query.status = { $ne: "Draft" };
-    
-    query.createdBy = { $in: approvedUserIds };
 
     const properties = await Property.find(query)
       .skip(skip)
@@ -369,11 +351,8 @@ const getAllProperties = async (req, res) => {
       .populate("amenities")
       .sort({ createdAt: -1 });
 
-    
     if (req.userId) {
-      const userLikes = await Likes.find({ userId: req.userId }).select(
-        "propertyId isLike"
-      );
+      const userLikes = await Likes.find({ userId: req.userId }).select("propertyId isLike");
       const userLikesMap = {};
       userLikes.forEach((like) => {
         userLikesMap[like.propertyId.toString()] = like.isLike;
@@ -385,8 +364,7 @@ const getAllProperties = async (req, res) => {
     }
 
     const totalPages = Math.ceil(totalProperties / pageSize);
-    const remainingPages =
-      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
+    const remainingPages = Math.max(0, totalPages - pageNumber);
 
     return res.status(200).json({
       success: true,
@@ -412,6 +390,7 @@ const getAllProperties = async (req, res) => {
     });
   }
 };
+
 const getAllOwnProperties = async (req, res) => {
   try {
     const {
@@ -445,73 +424,47 @@ const getAllOwnProperties = async (req, res) => {
       legalStatus,
       ownershipStatus,
     } = req.query;
+    
     const userId = req.userId;
-
-    const query = {};
+    const query = { createdBy: userId }; // apply owner filter from the beginning
 
     if (location) query.address = { $regex: location, $options: "i" };
 
     if (type) {
-      const propertyTypeDoc = await PropertyType.findOne({
-        name: new RegExp(`^${type}$`, "i"),
-      });
-      if (propertyTypeDoc) {
-        query.propertyType = propertyTypeDoc._id;
-      } else {
-        query._id = { $in: [] };
-      }
+      const typeDoc = await PropertyType.findOne({ name: new RegExp(`^${type}$`, "i") });
+      if (typeDoc) query.propertyType = typeDoc._id;
+      else query._id = { $in: [] }; // no match
     }
 
     if (listingType) {
-      const propertyListingTypeDoc = await PropertyListingType.findOne({
-        name: new RegExp(`^${listingType}$`, "i"),
-      });
-      if (propertyListingTypeDoc) {
-        query.listingType = propertyListingTypeDoc._id;
-      } else {
-        query._id = { $in: [] };
-      }
+      const listingTypeDoc = await PropertyListingType.findOne({ name: new RegExp(`^${listingType}$`, "i") });
+      if (listingTypeDoc) query.listingType = listingTypeDoc._id;
+      else query._id = { $in: [] };
     }
 
     if (amenities) {
-      const amenityInputs = amenities.split(",").map((a) => a.trim());
-
-      const isValidObjectIds = amenityInputs.every((id) =>
-        /^[a-f\d]{24}$/i.test(id)
-      );
-
+      const amenityInputs = amenities.split(",").map(a => a.trim());
+      const isValidObjectIds = amenityInputs.every(id => /^[a-f\d]{24}$/i.test(id));
       if (isValidObjectIds) {
         query.amenities = { $all: amenityInputs };
       } else {
-        const regexArray = amenityInputs.map(
-          (name) => new RegExp(`^${name}$`, "i")
-        );
-
+        const regexArray = amenityInputs.map(name => new RegExp(`^${name}$`, "i"));
         const amenityDocs = await Amenities.find({ name: { $in: regexArray } });
-
-        if (amenityDocs.length) {
-          const ids = amenityDocs.map((doc) => doc._id);
-          query.amenities = { $all: ids };
-        } else {
-          query._id = { $in: [] };
-        }
+        const ids = amenityDocs.map(doc => doc._id);
+        query.amenities = ids.length ? { $all: ids } : { $in: [] };
       }
     }
 
-    if (minPrice || maxPrice) {
-      query.price = { $gte: minPrice || 0, $lte: maxPrice || 1000000 };
-    }
-
-    if (minSize || maxSize) {
-      query.propertySize = { $gte: minSize || 0, $lte: maxSize || 1000000 };
-    }
+    if (minPrice || maxPrice) query.price = { $gte: minPrice || 0, $lte: maxPrice || Infinity };
+    if (minSize || maxSize) query.propertySize = { $gte: minSize || 0, $lte: maxSize || Infinity };
 
     if (bedrooms) query.bedroom = bedrooms;
-    if (legalStatus) query.legalStatus = legalStatus;
-    if (ownershipStatus) query.ownershipStatus = ownershipStatus;
     if (bathrooms) query.bathroom = bathrooms;
     if (kitchen) query.kitchen = kitchen;
     if (parking) query.parking = parking;
+
+    if (legalStatus) query.legalStatus = legalStatus;
+    if (ownershipStatus) query.ownershipStatus = ownershipStatus;
 
     if (search) {
       query.$or = [
@@ -529,107 +482,65 @@ const getAllOwnProperties = async (req, res) => {
     if (isFeatured === "true") query.featured = true;
     else if (isFeatured === "false") query.featured = false;
 
-    switch (rentOrSale) {
-      case "Rent":
-        query.rentOrSale = "Rent";
-        break;
-      case "Sale":
-        query.rentOrSale = "Sale";
-        break;
-      case "PG":
-        query.rentOrSale = "PG";
-        break;
+    if (["Rent", "Sale", "PG"].includes(rentOrSale)) {
+      query.rentOrSale = rentOrSale;
     }
 
     if (timeFilter) {
       const now = new Date();
       let startDate;
-      switch (timeFilter) {
-        case "week":
-          startDate = new Date(now.setDate(now.getDate() - 7));
-          break;
-        case "month":
-          startDate = new Date(now.setMonth(now.getMonth() - 1));
-          break;
-        case "year":
-          startDate = new Date(now.setFullYear(now.getFullYear() - 1));
-          break;
-      }
+      if (timeFilter === "week") startDate = new Date(now.setDate(now.getDate() - 7));
+      else if (timeFilter === "month") startDate = new Date(now.setMonth(now.getMonth() - 1));
+      else if (timeFilter === "year") startDate = new Date(now.setFullYear(now.getFullYear() - 1));
       if (startDate) query.createdAt = { $gte: startDate };
     }
 
-    if (req.userId && isLike) {
-      const userLikes = await Likes.find({
-        userId: req.userId,
-        isLike: true,
-      }).select("propertyId");
-
-      const likedPropertyIds = userLikes.map((like) => like.propertyId);
-      if (isLike === "true") {
-        query._id = { $in: likedPropertyIds };
-      } else if (isLike === "false") {
-        query._id = { $nin: likedPropertyIds };
-      }
+    if (isLike && req.userId) {
+      const userLikes = await Likes.find({ userId: req.userId, isLike: true }).select("propertyId");
+      const likedIds = userLikes.map((l) => l.propertyId);
+      if (isLike === "true") query._id = { $in: likedIds };
+      else if (isLike === "false") query._id = { $nin: likedIds };
     }
 
     if (country) query.country = { $regex: country, $options: "i" };
     if (state) query.state = { $regex: state, $options: "i" };
     if (city) query.city = { $regex: city, $options: "i" };
 
-    if (furnishingStatus) {
-      query.furnishingStatus = {
-        $regex: `^${furnishingStatus}$`,
-        $options: "i",
-      };
-    }
+    if (furnishingStatus) query.furnishingStatus = { $regex: `^${furnishingStatus}$`, $options: "i" };
 
     const pageNumber = parseInt(page);
     const pageSize = parseInt(limit);
     const skip = (pageNumber - 1) * pageSize;
 
-    const totalProperties = await Property.countDocuments(query);
-    const saleProperties = await Property.countDocuments({
-      ...query,
-      rentOrSale: "Sale",
-    });
-    const rentProperties = await Property.countDocuments({
-      ...query,
-      rentOrSale: "Rent",
-    });
-    const vacantProperties = await Property.countDocuments({
-      ...query,
-      rentOrSale: { $ne: "Sale" },
-      visible: true,
-    });
-    query.createdBy = userId;
-
-    const properties = await Property.find(query)
-      .skip(skip)
-      .limit(pageSize)
-      .populate("propertyType")
-      .populate("listingType")
-      .populate("createdBy")
-      .populate("agent")
-      .populate("amenities")
-      .sort({ createdAt: -1 });
+    // Count total properties *after* query is finalized
+    const [totalProperties, saleProperties, rentProperties, vacantProperties, properties] =
+      await Promise.all([
+        Property.countDocuments(query),
+        Property.countDocuments({ ...query, rentOrSale: "Sale" }),
+        Property.countDocuments({ ...query, rentOrSale: "Rent" }),
+        Property.countDocuments({ ...query, rentOrSale: { $ne: "Sale" }, visible: true }),
+        Property.find(query)
+          .skip(skip)
+          .limit(pageSize)
+          .populate("propertyType")
+          .populate("listingType")
+          .populate("createdBy")
+          .populate("agent")
+          .populate("amenities")
+          .sort({ createdAt: -1 }),
+      ]);
 
     if (req.userId) {
-      const userLikes = await Likes.find({ userId: req.userId }).select(
-        "propertyId isLike"
-      );
-      const userLikesMap = {};
-      userLikes.forEach((like) => {
-        userLikesMap[like.propertyId.toString()] = like.isLike;
-      });
-
-      properties.forEach((property) => {
-        property._doc.isLike = userLikesMap[property._id.toString()] || false;
+      const userLikes = await Likes.find({ userId: req.userId }).select("propertyId isLike");
+      const likeMap = {};
+      userLikes.forEach((like) => (likeMap[like.propertyId.toString()] = like.isLike));
+      properties.forEach((p) => {
+        p._doc.isLike = likeMap[p._id.toString()] || false;
       });
     }
 
     const totalPages = Math.ceil(totalProperties / pageSize);
-    const remainingPages =
-      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
+    const remainingPages = Math.max(0, totalPages - pageNumber);
 
     return res.status(200).json({
       success: true,
@@ -647,7 +558,6 @@ const getAllOwnProperties = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(error);
     return res.status(500).json({
       success: false,
       message: "Failed to retrieve properties",
@@ -655,6 +565,7 @@ const getAllOwnProperties = async (req, res) => {
     });
   }
 };
+
 
 const getPropertyById = async (req, res) => {
   try {
