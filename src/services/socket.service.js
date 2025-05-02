@@ -63,30 +63,46 @@ const initSocketIo = (io) => {
     });
 
     // ✅ Mark messages as seen
-    socket.on("markMessagesAsSeen", async ({ userId, chatPartnerId, groupId }) => {
+    socket.on("markMessagesAsSeen", async ({ userId, chatPartnerId, groupId, propertyId }) => {
       try {
+        // Mark direct messages as seen
         if (chatPartnerId) {
           await Message.updateMany(
             { senderId: chatPartnerId, receiverId: userId, isSeen: false },
             { $set: { isSeen: true } }
           );
         }
-
+    
+        // Mark group messages as seen
         if (groupId) {
           await Message.updateMany(
             { groupId, senderId: { $ne: userId }, isSeen: false },
             { $set: { isSeen: true } }
           );
         }
-
+    
+        // Mark property-based messages as seen
+        if (propertyId) {
+          await Message.updateMany(
+            { propertyId: new mongoose.Types.ObjectId(propertyId), receiverId: userId, isSeen: false },
+            { $set: { isSeen: true } }
+          );
+        }
+    
         socket.emit("messagesSeen", {
           success: true,
           message: "Messages marked as seen",
         });
       } catch (error) {
         console.error("Error marking messages as seen:", error);
+        socket.emit("messagesSeenError", {
+          success: false,
+          message: "Error marking messages as seen",
+          error: error.message,
+        });
       }
     });
+    
 
     // ✅ Retrieve unseen messages count
     socket.on("getUnseenMessagesCount", async (userId) => {
@@ -98,12 +114,17 @@ const initSocketIo = (io) => {
             message: "Invalid userId format",
           });
         }
-
+    
+        const objectId = new mongoose.Types.ObjectId(userIdString);
+    
+        // Direct Messages
         const unseenDirect = await Message.aggregate([
           {
             $match: {
-              receiverId: new mongoose.Types.ObjectId(userIdString),
+              receiverId: objectId,
               isSeen: false,
+              propertyId: { $exists: false },
+              groupId: { $exists: false }
             },
           },
           {
@@ -113,13 +134,14 @@ const initSocketIo = (io) => {
             },
           },
         ]);
-
+    
+        // Group Messages
         const unseenGroup = await Message.aggregate([
           {
             $match: {
               groupId: { $exists: true },
               isSeen: false,
-              senderId: { $ne: new mongoose.Types.ObjectId(userIdString) },
+              senderId: { $ne: objectId },
             },
           },
           {
@@ -129,10 +151,47 @@ const initSocketIo = (io) => {
             },
           },
         ]);
-
+    
+        // Property Chats
+        const unseenProperty = await Message.aggregate([
+          {
+            $match: {
+              isSeen: false,
+              receiverId: objectId,
+              propertyId: { $exists: true },
+            },
+          },
+          {
+            $group: {
+              _id: "$propertyId",
+              count: { $sum: 1 },
+            },
+          },
+          {
+            $lookup: {
+              from: "properties",
+              localField: "_id",
+              foreignField: "_id",
+              as: "property",
+            },
+          },
+          {
+            $unwind: "$property"
+          },
+          {
+            $project: {
+              propertyId: "$_id",
+              count: 1,
+              "property.title": 1,
+              "property.location": 1,
+            },
+          }
+        ]);
+    
         socket.emit("unseenMessagesCount", {
           unseenDirect,
           unseenGroup,
+          unseenProperty,
         });
       } catch (error) {
         console.error("Error retrieving unseen messages count:", error);
@@ -143,11 +202,11 @@ const initSocketIo = (io) => {
         });
       }
     });
-
+    
     // ✅ Retrieve previous chat (with or without propertyId)
-    socket.on("getPreviousChat", async ({ userId1, userId2, currentUserId }) => {
+    socket.on("getPreviousChat", async ({ userId1, userId2, currentUserId, propertyId }) => {
       try {
-        const messages = await Message.find({
+        const query = {
           $or: [
             { senderId: userId1, receiverId: userId2 },
             { senderId: userId2, receiverId: userId1 },
@@ -162,8 +221,18 @@ const initSocketIo = (io) => {
               },
             },
           ],
-        }).sort({ timestamp: 1 });
-
+        };
+    
+        if (propertyId && mongoose.Types.ObjectId.isValid(propertyId)) {
+          query.propertyId = new mongoose.Types.ObjectId(propertyId);
+        }
+    
+        const messages = await Message.find(query)
+          .sort({ timestamp: 1 })
+          .populate("senderId")
+          .populate("receiverId")
+          .populate("propertyId"); // optional, will be null if not available
+    
         socket.emit("previousChat", {
           success: true,
           message: "Previous chat retrieved successfully",
@@ -178,13 +247,15 @@ const initSocketIo = (io) => {
         });
       }
     });
+    
 
     // ✅ Retrieve chat partners
     socket.on("getChatPartners", async (userId) => {
       try {
         const userIdString = userId?.userId || userId;
         const objectIdUserId = new mongoose.Types.ObjectId(userIdString);
-
+        
+        // Fetch user-based chat partners (existing logic)
         const chatPartners = await Message.aggregate([
           {
             $match: {
@@ -211,13 +282,19 @@ const initSocketIo = (io) => {
             },
           },
           {
+            $sort: { timestamp: 1 },
+          },
+          {
             $group: {
               _id: {
-                $cond: {
-                  if: { $eq: ["$senderId", objectIdUserId] },
-                  then: "$receiverId",
-                  else: "$senderId",
+                user: {
+                  $cond: {
+                    if: { $eq: ["$senderId", objectIdUserId] },
+                    then: "$receiverId",
+                    else: "$senderId",
+                  },
                 },
+                property: "$propertyId",
               },
               lastMessage: { $last: "$content" },
               messageId: { $last: "$_id" },
@@ -241,17 +318,35 @@ const initSocketIo = (io) => {
           {
             $lookup: {
               from: "users",
-              localField: "_id",
+              localField: "_id.user",
               foreignField: "_id",
               as: "userDetails",
             },
           },
           { $unwind: "$userDetails" },
           {
+            $lookup: {
+              from: "properties",
+              localField: "_id.property",
+              foreignField: "_id",
+              as: "property",
+            },
+          },
+          {
+            $unwind: {
+              path: "$property",
+              preserveNullAndEmptyArrays: true,
+            },
+          },
+          {
             $project: {
-              userId: "$_id",
-              "userDetails.name": 1,
-              "userDetails.profileImage": 1,
+              userId: "$_id.user",
+              propertyId: "$_id.property",
+              userDetails: {
+                name: "$userDetails.name",
+                profileImage: "$userDetails.profileImage",
+              },
+              property: "$property", // sends full property document
               lastMessage: 1,
               lastMessageTime: 1,
               unseenMessages: 1,
@@ -260,11 +355,65 @@ const initSocketIo = (io) => {
           },
           { $sort: { lastMessageTime: -1 } },
         ]);
-
+        
+        // Fetch property-based chats separately (new property flow)
+        const propertyChats = await Message.aggregate([
+          {
+            $match: {
+              $and: [
+                { receiverId: objectIdUserId },
+                { propertyId: { $exists: true } },
+              ],
+            },
+          },
+          {
+            $group: {
+              _id: "$propertyId",
+              lastMessage: { $last: "$content" },
+              messageId: { $last: "$_id" },
+              lastMessageTime: { $last: "$timestamp" },
+              unseenMessages: {
+                $sum: {
+                  $cond: [
+                    { $eq: ["$isSeen", false] },
+                    1,
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+          {
+            $lookup: {
+              from: "properties",
+              localField: "_id",
+              foreignField: "_id",
+              as: "property",
+            },
+          },
+          {
+            $unwind: {
+              path: "$property",
+              preserveNullAndEmptyArrays: true,
+            },
+          },
+          {
+            $project: {
+              propertyId: "$_id",
+              property: "$property", // sends full property document
+              lastMessage: 1,
+              lastMessageTime: 1,
+              unseenMessages: 1,
+              messageId: 1,
+            },
+          },
+          { $sort: { lastMessageTime: -1 } },
+        ]);
+    
         socket.emit("chatPartners", {
           success: true,
           message: "Chat partners retrieved successfully",
-          data: chatPartners,
+          data: { chatPartners, propertyChats },
         });
       } catch (error) {
         console.error("Error retrieving chat partners:", error);
@@ -275,6 +424,7 @@ const initSocketIo = (io) => {
         });
       }
     });
+    
     socket.on("getAllGroups", async (userId) => {
       try {
         const user = await User.findById(userId.userId);
