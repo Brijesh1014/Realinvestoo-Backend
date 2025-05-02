@@ -2,88 +2,96 @@ const Group = require("../models/group.model");
 const Message = require("../models/message.model");
 const mongoose = require("mongoose");
 const User = require("../models/user.model");
+const Property = require('../models/property.model')
 
 const initSocketIo = (io) => {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
-    // Send direct message
-    socket.on("sendMessage", async ({ senderId, receiverId, content }) => {
-      const newMessage = new Message({ senderId, receiverId, content });
+    // ✅ Send direct message (propertyId optional)
+    socket.on("sendMessage", async ({ senderId, content, propertyId, receiverId }) => {
       try {
+        let finalReceiverId = receiverId;
+    
+        if (propertyId && mongoose.Types.ObjectId.isValid(propertyId)) {
+          const property = await Property.findById(propertyId).select("createdBy");
+          if (property) {
+            finalReceiverId = property.createdBy;
+          } else {
+            console.log("Property not found");
+            return;
+          }
+        }
+    
+        if (!finalReceiverId) {
+          console.log("Receiver ID is required if property is not specified");
+          return;
+        }
+    
+        const newMessage = new Message({
+          senderId,
+          receiverId: finalReceiverId,
+          content,
+          ...(propertyId && mongoose.Types.ObjectId.isValid(propertyId) ? { propertyId } : {})
+        });
+    
         await newMessage.save();
+    
         const populatedMessage = await Message.findById(newMessage._id)
           .populate("senderId")
-          .populate("receiverId");
-
+          .populate("receiverId")
+          .populate("propertyId");
+    
         io.emit("receiveMessage", populatedMessage);
       } catch (error) {
-        console.log("Error saving message:", error);
+        console.log("Error sending direct message:", error);
       }
     });
+    
 
-    // Send group message
+    // ✅ Group message
     socket.on("sendGroupMessage", async ({ senderId, groupId, content }) => {
-      const newMessage = new Message({ senderId, groupId, content });
       try {
+        const newMessage = new Message({ senderId, groupId, content });
         await newMessage.save();
-        const populatedMessage = await Message.findById(
-          newMessage._id
-        ).populate("senderId");
 
+        const populatedMessage = await Message.findById(newMessage._id).populate("senderId");
         io.emit("receiveGroupMessage", populatedMessage);
       } catch (error) {
-        console.log("Error saving group message:", error);
+        console.log("Error sending group message:", error);
       }
     });
 
-    // Mark messages as seen
-    socket.on(
-      "markMessagesAsSeen",
-      async ({ userId, chatPartnerId, groupId }) => {
-        try {
-          if (chatPartnerId) {
-            await Message.updateMany(
-              {
-                senderId: chatPartnerId,
-                receiverId: userId,
-                isSeen: false,
-              },
-              { $set: { isSeen: true } }
-            );
-          }
-
-          if (groupId) {
-            await Message.updateMany(
-              {
-                groupId,
-                senderId: { $ne: userId },
-                isSeen: false,
-              },
-              { $set: { isSeen: true } }
-            );
-          }
-          socket.emit("messagesSeen", {
-            success: true,
-            message: "Messages marked as seen",
-          });
-
-          console.log("Messages marked as seen:", {
-            userId,
-            chatPartnerId,
-            groupId,
-          });
-        } catch (error) {
-          console.error("Error marking messages as seen:", error);
+    // ✅ Mark messages as seen
+    socket.on("markMessagesAsSeen", async ({ userId, chatPartnerId, groupId }) => {
+      try {
+        if (chatPartnerId) {
+          await Message.updateMany(
+            { senderId: chatPartnerId, receiverId: userId, isSeen: false },
+            { $set: { isSeen: true } }
+          );
         }
-      }
-    );
 
-    // Retrieve unseen messages count
+        if (groupId) {
+          await Message.updateMany(
+            { groupId, senderId: { $ne: userId }, isSeen: false },
+            { $set: { isSeen: true } }
+          );
+        }
+
+        socket.emit("messagesSeen", {
+          success: true,
+          message: "Messages marked as seen",
+        });
+      } catch (error) {
+        console.error("Error marking messages as seen:", error);
+      }
+    });
+
+    // ✅ Retrieve unseen messages count
     socket.on("getUnseenMessagesCount", async (userId) => {
       try {
         const userIdString = userId?.userId || userId;
-
         if (!mongoose.Types.ObjectId.isValid(userIdString)) {
           return socket.emit("unseenMessagesCountError", {
             success: false,
@@ -136,27 +144,26 @@ const initSocketIo = (io) => {
       }
     });
 
-    // Retrieve previous chat
+    // ✅ Retrieve previous chat (with or without propertyId)
     socket.on("getPreviousChat", async ({ userId1, userId2, currentUserId }) => {
       try {
-
         const messages = await Message.find({
           $or: [
             { senderId: userId1, receiverId: userId2 },
             { senderId: userId2, receiverId: userId1 },
           ],
           $nor: [
-            { 
-              softDelete: { 
-                $elemMatch: { 
+            {
+              softDelete: {
+                $elemMatch: {
                   userId: new mongoose.Types.ObjectId(currentUserId),
-                  isDeleted: true 
-                }
-              }
-            }
+                  isDeleted: true,
+                },
+              },
+            },
           ],
         }).sort({ timestamp: 1 });
-    
+
         socket.emit("previousChat", {
           success: true,
           message: "Previous chat retrieved successfully",
@@ -171,13 +178,13 @@ const initSocketIo = (io) => {
         });
       }
     });
-    
-    
+
+    // ✅ Retrieve chat partners
     socket.on("getChatPartners", async (userId) => {
       try {
         const userIdString = userId?.userId || userId;
         const objectIdUserId = new mongoose.Types.ObjectId(userIdString);
-    
+
         const chatPartners = await Message.aggregate([
           {
             $match: {
@@ -213,7 +220,7 @@ const initSocketIo = (io) => {
                 },
               },
               lastMessage: { $last: "$content" },
-              messageId:{$last:"$_id"},
+              messageId: { $last: "$_id" },
               lastMessageTime: { $last: "$timestamp" },
               unseenMessages: {
                 $sum: {
@@ -233,15 +240,13 @@ const initSocketIo = (io) => {
           },
           {
             $lookup: {
-              from: "users", // Assuming your user collection is named "users"
+              from: "users",
               localField: "_id",
               foreignField: "_id",
               as: "userDetails",
             },
           },
-          {
-            $unwind: "$userDetails",
-          },
+          { $unwind: "$userDetails" },
           {
             $project: {
               userId: "$_id",
@@ -250,14 +255,12 @@ const initSocketIo = (io) => {
               lastMessage: 1,
               lastMessageTime: 1,
               unseenMessages: 1,
-              messageId:1
+              messageId: 1,
             },
           },
-          {
-            $sort: { lastMessageTime: -1 },
-          },
+          { $sort: { lastMessageTime: -1 } },
         ]);
-    
+
         socket.emit("chatPartners", {
           success: true,
           message: "Chat partners retrieved successfully",
@@ -272,8 +275,6 @@ const initSocketIo = (io) => {
         });
       }
     });
-    
-
     socket.on("getAllGroups", async (userId) => {
       try {
         const user = await User.findById(userId.userId);

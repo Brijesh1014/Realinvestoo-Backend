@@ -18,6 +18,7 @@ const messageSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  propertyId: { type: mongoose.Schema.Types.ObjectId, ref: "Property" },
   timestamp: {
     type: Date,
     default: Date.now,
