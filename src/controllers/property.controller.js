@@ -423,6 +423,7 @@ const getAllOwnProperties = async (req, res) => {
       furnishingStatus,
       legalStatus,
       ownershipStatus,
+      status
     } = req.query;
     
     const userId = req.userId;
@@ -462,6 +463,7 @@ const getAllOwnProperties = async (req, res) => {
     if (bathrooms) query.bathroom = bathrooms;
     if (kitchen) query.kitchen = kitchen;
     if (parking) query.parking = parking;
+    if (status) query.status = status;
 
     if (legalStatus) query.legalStatus = legalStatus;
     if (ownershipStatus) query.ownershipStatus = ownershipStatus;
