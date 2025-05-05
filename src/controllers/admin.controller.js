@@ -23,7 +23,7 @@ const getAllUsers = async (req, res) => {
     const pageSize = parseInt(limit);
     const skip = (pageNumber - 1) * pageSize;
 
-    const searchRegex = new RegExp(search, "i"); 
+    const searchRegex = new RegExp(search, "i");
     const searchQuery = search
       ? {
           $or: [
@@ -55,7 +55,8 @@ const getAllUsers = async (req, res) => {
       .sort({ createdAt: -1 });
 
     const totalPages = Math.ceil(totalUsersCount / pageSize);
-    const remainingPages = totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
+    const remainingPages =
+      totalPages - pageNumber > 0 ? totalPages - pageNumber : 0;
 
     return res.status(200).json({
       success: true,
@@ -71,10 +72,11 @@ const getAllUsers = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
 };
-
 
 const deleteUser = async (req, res) => {
   try {
@@ -89,7 +91,10 @@ const deleteUser = async (req, res) => {
     }
 
     if (user.profileImage) {
-      const profileImagePublicId = user.profileImage.split("/").pop().split(".")[0];
+      const profileImagePublicId = user.profileImage
+        .split("/")
+        .pop()
+        .split(".")[0];
       await cloudinary.uploader.destroy(profileImagePublicId);
     }
 
@@ -132,33 +137,58 @@ const updateUserStatus = async (req, res) => {
   try {
     const userId = req.params.id;
     const adminId = req.userId;
-    const { status,reason } = req.body; 
+    const { status, reason } = req.body;
 
     if (!["Approved", "Rejected"].includes(status)) {
-      return res.status(400).json({ success: false, message: "Invalid status. Must be 'Approved' or 'Reject'" });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Invalid status. Must be 'Approved' or 'Reject'",
+        });
     }
 
     const adminUser = await User_Model.findById(adminId);
     if (!adminUser?.isAdmin) {
-      return res.status(403).json({ success: false, message: "You do not have permission" });
+      return res
+        .status(403)
+        .json({ success: false, message: "You do not have permission" });
     }
 
     const user = await User_Model.findById(userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     if (user.isAdmin) {
-      return res.status(400).json({ success: false, message: "Admin status cannot be updated" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Admin status cannot be updated" });
     }
 
     if (user.status === status) {
-      return res.status(400).json({ success: false, message: `User is already ${status.toLowerCase()}` });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: `User is already ${status.toLowerCase()}`,
+        });
     }
 
     if (status === "Approved" && !user.document) {
-      return res.status(400).json({ success: false, message: "Document not uploaded" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Document not uploaded" });
     }
+    user.status = status;
+
+    if (status === "Rejected" && user.document) {
+      user.document = null;
+    }
+
+    await user.save();
 
     user.status = status;
     await user.save();
@@ -168,11 +198,15 @@ const updateUserStatus = async (req, res) => {
       status === "Approved"
         ? "Your account has been approved! You can now add properties."
         : reason
-          ? `Your account has been rejected. Reason: ${user.reason}`
-          : "Your account has been rejected. Please contact support or upload correct documents.";
-    
+        ? `Your account has been rejected. Reason: ${user.reason}`
+        : "Your account has been rejected. Please contact support or upload correct documents.";
 
-    await FCMService.sendNotificationToUser(adminId, user._id, notificationTitle, notificationMessage);
+    await FCMService.sendNotificationToUser(
+      adminId,
+      user._id,
+      notificationTitle,
+      notificationMessage
+    );
 
     return res.status(200).json({
       success: true,
@@ -189,7 +223,6 @@ const updateUserStatus = async (req, res) => {
   }
 };
 
-
 const getPendingDocumentUsers = async (req, res) => {
   try {
     const { page = 1, pageSize = 10, status, search } = req.query;
@@ -201,7 +234,7 @@ const getPendingDocumentUsers = async (req, res) => {
     };
 
     if (status) {
-      query.status = status; 
+      query.status = status;
     }
 
     if (search) {
@@ -232,12 +265,10 @@ const getPendingDocumentUsers = async (req, res) => {
   }
 };
 
-
-
 module.exports = {
   getAllUsers,
   deleteUser,
   fetchAllUsers,
   updateUserStatus,
-  getPendingDocumentUsers
+  getPendingDocumentUsers,
 };
