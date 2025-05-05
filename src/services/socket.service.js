@@ -2,7 +2,7 @@ const Group = require("../models/group.model");
 const Message = require("../models/message.model");
 const mongoose = require("mongoose");
 const User = require("../models/user.model");
-const Property = require('../models/property.model')
+const Property = require("../models/property.model");
 const initSocketIo = (io) => {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
@@ -16,29 +16,34 @@ const initSocketIo = (io) => {
       ) {
         const uniqueRoomId = `property_${propertyId}_user_${userId}`;
         socket.join(uniqueRoomId);
-        
+
         socket.join(`user_${userId}`);
-        
-        console.log(`User ${userId} joined property chat room: ${uniqueRoomId}`);
-        
+
+        console.log(
+          `User ${userId} joined property chat room: ${uniqueRoomId}`
+        );
+
         socket.emit("joinedChat", {
           success: true,
           roomId: uniqueRoomId,
-          message: "Successfully joined property chat"
+          message: "Successfully joined property chat",
         });
       } else {
         socket.emit("error", {
-          message: "Both valid userId and valid propertyId are required to join the chat."
+          message:
+            "Both valid userId and valid propertyId are required to join the chat.",
         });
       }
-    });    
+    });
 
     socket.on(
       "sendMessage",
       async ({ senderId, content, propertyId, receiverId }) => {
         try {
           if (!senderId || !content) {
-            socket.emit("error", { message: "Sender ID and message content are required." });
+            socket.emit("error", {
+              message: "Sender ID and message content are required.",
+            });
             return;
           }
 
@@ -46,29 +51,34 @@ const initSocketIo = (io) => {
           let room;
 
           if (propertyId && mongoose.Types.ObjectId.isValid(propertyId)) {
-            const property = await Property.findById(propertyId).select("createdBy");
-            
+            const property = await Property.findById(propertyId).select(
+              "createdBy"
+            );
+
             if (!property) {
               socket.emit("error", { message: "Property not found" });
               return;
             }
-            
+
             const propertyOwnerId = property.createdBy.toString();
             finalReceiverId = propertyOwnerId;
-            
+
             const isOwnerSending = senderId === propertyOwnerId;
-            
+
             if (isOwnerSending && receiverId) {
               room = `property_${propertyId}_user_${receiverId}`;
             } else {
               room = `property_${propertyId}_user_${senderId}`;
             }
-          } 
-          else if (receiverId && mongoose.Types.ObjectId.isValid(receiverId)) {
+          } else if (
+            receiverId &&
+            mongoose.Types.ObjectId.isValid(receiverId)
+          ) {
             room = `user_${receiverId}`;
-          } 
-          else {
-            socket.emit("error", { message: "Receiver ID or property ID required" });
+          } else {
+            socket.emit("error", {
+              message: "Receiver ID or property ID required",
+            });
             return;
           }
 
@@ -78,9 +88,9 @@ const initSocketIo = (io) => {
             content,
             ...(propertyId ? { propertyId } : {}),
             timestamp: new Date(),
-            isSeen: false
+            isSeen: false,
           });
-          
+
           await newMessage.save();
 
           const populatedMessage = await Message.findById(newMessage._id)
@@ -89,13 +99,16 @@ const initSocketIo = (io) => {
             .populate("propertyId", "title location price");
 
           io.to(room).emit("receiveMessage", populatedMessage);
-          
+
           io.to(`user_${senderId}`).emit("receiveMessage", populatedMessage);
-          
+
           console.log(`Message sent to room: ${room}`);
         } catch (error) {
           console.error("Error sending message:", error);
-          socket.emit("error", { message: "Failed to send message", error: error.message });
+          socket.emit("error", {
+            message: "Failed to send message",
+            error: error.message,
+          });
         }
       }
     );
@@ -177,7 +190,7 @@ const initSocketIo = (io) => {
             $group: {
               _id: "$propertyId",
               count: { $sum: 1 },
-              senderId: { $first: "$senderId" }
+              senderId: { $first: "$senderId" },
             },
           },
           {
@@ -209,7 +222,7 @@ const initSocketIo = (io) => {
               "property.title": 1,
               "property.location": 1,
               "sender._id": 1,
-              "sender.name": 1
+              "sender.name": 1,
             },
           },
         ]);
@@ -361,113 +374,113 @@ const initSocketIo = (io) => {
               lastMessageTime: 1,
               unseenMessages: 1,
               messageId: 1,
-              chatType: { $literal: "direct" }
+              chatType: { $literal: "direct" },
             },
           },
           { $sort: { lastMessageTime: -1 } },
         ]);
 
-        const userProperties = await Property.find({ createdBy: objectIdUserId })
-          .select('_id')
+        const userProperties = await Property.find({
+          createdBy: objectIdUserId,
+        })
+          .select("_id")
           .lean();
-        
-        const userPropertyIds = userProperties.map(prop => prop._id);
 
-        const ownerPropertyChats = userPropertyIds.length > 0 ? await Message.aggregate([
-          {
-            $match: {
-              propertyId: { $in: userPropertyIds },
-              $nor: [
+        const userPropertyIds = userProperties.map((prop) => prop._id);
+
+        const ownerPropertyChats =
+          userPropertyIds.length > 0
+            ? await Message.aggregate([
                 {
-                  softDelete: {
-                    $elemMatch: {
-                      userId: objectIdUserId,
-                      isDeleted: true,
+                  $match: {
+                    propertyId: { $in: userPropertyIds },
+                    $nor: [
+                      {
+                        softDelete: {
+                          $elemMatch: {
+                            userId: objectIdUserId,
+                            isDeleted: true,
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+                {
+                  $sort: { timestamp: 1 },
+                },
+                {
+                  $group: {
+                    _id: {
+                      property: "$propertyId",
+                      user: {
+                        $cond: {
+                          if: { $eq: ["$senderId", objectIdUserId] },
+                          then: "$receiverId",
+                          else: "$senderId",
+                        },
+                      },
+                    },
+                    lastMessage: { $last: "$content" },
+                    messageId: { $last: "$_id" },
+                    lastMessageTime: { $last: "$timestamp" },
+                    unseenMessages: {
+                      $sum: {
+                        $cond: [
+                          {
+                            $and: [
+                              { $eq: ["$receiverId", objectIdUserId] },
+                              { $eq: ["$isSeen", false] },
+                            ],
+                          },
+                          1,
+                          0,
+                        ],
+                      },
                     },
                   },
                 },
-              ],
-            },
-          },
-          {
-            $sort: { timestamp: 1 },
-          },
-          {
-            $group: {
-              _id: {
-                property: "$propertyId",
-                user: {
-                  $cond: {
-                    if: { $eq: ["$senderId", objectIdUserId] },
-                    then: "$receiverId",
-                    else: "$senderId",
+                {
+                  $lookup: {
+                    from: "properties",
+                    localField: "_id.property",
+                    foreignField: "_id",
+                    as: "property",
                   },
                 },
-              },
-              lastMessage: { $last: "$content" },
-              messageId: { $last: "$_id" },
-              lastMessageTime: { $last: "$timestamp" },
-              unseenMessages: {
-                $sum: {
-                  $cond: [
-                    {
-                      $and: [
-                        { $eq: ["$receiverId", objectIdUserId] },
-                        { $eq: ["$isSeen", false] },
-                      ],
-                    },
-                    1,
-                    0,
-                  ],
+                {
+                  $unwind: "$property",
                 },
-              },
-            },
-          },
-          {
-            $lookup: {
-              from: "properties",
-              localField: "_id.property",
-              foreignField: "_id",
-              as: "property",
-            },
-          },
-          {
-            $unwind: "$property",
-          },
-          {
-            $lookup: {
-              from: "users",
-              localField: "_id.user",
-              foreignField: "_id",
-              as: "userDetails",
-            },
-          },
-          {
-            $unwind: "$userDetails",
-          },
-          {
-            $project: {
-              propertyId: "$_id.property",
-              userId: "$_id.user",
-              property: {
-                _id: "$property._id",
-                title: "$property.title",
-                location: "$property.location",
-                price: "$property.price",
-              },
-              userDetails: {
-                name: "$userDetails.name",
-                profileImage: "$userDetails.profileImage",
-              },
-              lastMessage: 1,
-              lastMessageTime: 1,
-              unseenMessages: 1,
-              messageId: 1,
-              chatType: { $literal: "property" }
-            },
-          },
-          { $sort: { lastMessageTime: -1 } },
-        ]) : [];
+                {
+                  $lookup: {
+                    from: "users",
+                    localField: "_id.user",
+                    foreignField: "_id",
+                    as: "userDetails",
+                  },
+                },
+                {
+                  $unwind: "$userDetails",
+                },
+                {
+                  $project: {
+                    propertyId: "$_id.property",
+                    userId: "$_id.user",
+                    property: "$property",
+                    userDetails: {
+                      name: "$userDetails.name",
+                      profileImage: "$userDetails.profileImage",
+                    },
+                    lastMessage: 1,
+                    lastMessageTime: 1,
+                    unseenMessages: 1,
+                    messageId: 1,
+                    chatType: { $literal: "property" },
+                  },
+                },
+                { $sort: { lastMessageTime: -1 } },
+              ])
+            : [];
 
         const userPropertyChats = await Message.aggregate([
           {
@@ -562,7 +575,7 @@ const initSocketIo = (io) => {
                 title: "$property.title",
                 location: "$property.location",
                 price: "$property.price",
-                createdBy: "$property.createdBy"
+                createdBy: "$property.createdBy",
               },
               userDetails: {
                 name: "$userDetails.name",
@@ -572,15 +585,15 @@ const initSocketIo = (io) => {
               lastMessageTime: 1,
               unseenMessages: 1,
               messageId: 1,
-              chatType: { $literal: "property" }
+              chatType: { $literal: "property" },
             },
           },
           { $sort: { lastMessageTime: -1 } },
           {
             $match: {
-              "property.createdBy": { $ne: objectIdUserId }
-            }
-          }
+              "property.createdBy": { $ne: objectIdUserId },
+            },
+          },
         ]);
 
         const propertyChats = [...ownerPropertyChats, ...userPropertyChats];
@@ -590,7 +603,7 @@ const initSocketIo = (io) => {
           message: "Chat partners retrieved successfully",
           data: {
             directChats: directChatPartners,
-            propertyChats: propertyChats
+            propertyChats: propertyChats,
           },
         });
       } catch (error) {
