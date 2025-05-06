@@ -33,7 +33,9 @@ const createBanner = async (req, res) => {
 
 const getAllBanners = async (req, res) => {
   try {
-    const banners = await Banner.find().populate("createdBy", "name email");
+    const banners = await Banner.find()
+      .sort({ createdAt: -1 })
+      .populate("createdBy", "name email");
     res.status(200).json({
       success: true,
       message: "Get all banners successfully",
