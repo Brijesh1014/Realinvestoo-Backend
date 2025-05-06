@@ -241,8 +241,8 @@ const getUserById = async (req, res) => {
 
 const uploadDocument = async (req, res) => {
   try {
-    const  id  = req.userId;
-    
+    const id = req.userId;
+
     const user = await User_Model.findById(id);
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
@@ -277,6 +277,11 @@ const uploadDocument = async (req, res) => {
     );
 
     user.document = documentUrl;
+
+    if (user.status === "Rejected") {
+      user.status = "Re-Upload";
+    }
+
     await user.save();
 
     return res.status(200).json({

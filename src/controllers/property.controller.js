@@ -1342,7 +1342,16 @@ const analyticDashboard = async (req, res) => {
     ]);
 
     const saleProperties = await Property.aggregate([
-      { $match: { rentOrSale: "Sale" } },
+      { 
+        $lookup: {
+          from: "propertylistingtypes",
+          localField: "listingType",
+          foreignField: "_id",
+          as: "listingTypeDetails"
+        }
+      },
+      { $unwind: "$listingTypeDetails" },
+      { $match: { "listingTypeDetails.name": "Sale" } },
       {
         $group: {
           _id: "$_id",
@@ -1373,27 +1382,77 @@ const analyticDashboard = async (req, res) => {
 
     const recentProperties = await Property.find({})
       .sort({ createdAt: -1 })
-      .limit(5);
+      .limit(5)
+      .populate('propertyType')
+      .populate('listingType')
+      .populate('agent')
+      .populate('createdBy')
+      .populate('amenities');
 
     const totalProperties = await Property.countDocuments();
+    
     const totalCustomers = await User.countDocuments({
       $or: [{ isSeller: true }, { isAgent: true }, { isBuyer: true }],
     });
-    const totalSale = await Property.countDocuments({ rentOrSale: "Sale" });
-    const totalRent = await Property.countDocuments({ rentOrSale: "Rent" });
-    const totalVacant = await Property.countDocuments({
-      rentOrSale: { $ne: "Sale" },
-      visible: true,
-    });
+
+    const totalSaleQuery = await Property.aggregate([
+      {
+        $lookup: {
+          from: "propertylistingtypes",
+          localField: "listingType",
+          foreignField: "_id",
+          as: "listingTypeDetails"
+        }
+      },
+      { $unwind: "$listingTypeDetails" },
+      { $match: { "listingTypeDetails.name": "Sale" } },
+      { $count: "count" }
+    ]);
+    const totalSale = totalSaleQuery.length > 0 ? totalSaleQuery[0].count : 0;
+
+    const totalRentQuery = await Property.aggregate([
+      {
+        $lookup: {
+          from: "propertylistingtypes",
+          localField: "listingType",
+          foreignField: "_id",
+          as: "listingTypeDetails"
+        }
+      },
+      { $unwind: "$listingTypeDetails" },
+      { $match: { "listingTypeDetails.name": "Rent" } },
+      { $count: "count" }
+    ]);
+    const totalRent = totalRentQuery.length > 0 ? totalRentQuery[0].count : 0;
+
+    const totalVacantQuery = await Property.aggregate([
+      {
+        $lookup: {
+          from: "propertylistingtypes",
+          localField: "listingType",
+          foreignField: "_id",
+          as: "listingTypeDetails"
+        }
+      },
+      { $unwind: "$listingTypeDetails" },
+      { $match: { 
+        "listingTypeDetails.name": { $ne: "Sale" },
+        "visible": true
+      }},
+      { $count: "count" }
+    ]);
+    const totalVacant = totalVacantQuery.length > 0 ? totalVacantQuery[0].count : 0;
 
     const totalRevenue = saleProperties.reduce(
       (total, property) => total + property.totalRevenue,
       0
     );
+    
     const totalIncome = saleProperties.reduce(
       (total, property) => total + property.totalIncome,
       0
     );
+    
     const totalExpenses = saleProperties.reduce(
       (total, property) => total + property.totalExpenses,
       0
@@ -1412,7 +1471,16 @@ const analyticDashboard = async (req, res) => {
       : 0;
 
     const monthlyAnalytics = await Property.aggregate([
-      { $match: { rentOrSale: "Sale" } },
+      {
+        $lookup: {
+          from: "propertylistingtypes",
+          localField: "listingType",
+          foreignField: "_id",
+          as: "listingTypeDetails"
+        }
+      },
+      { $unwind: "$listingTypeDetails" },
+      { $match: { "listingTypeDetails.name": "Sale" } },
       {
         $group: {
           _id: {
@@ -1472,6 +1540,7 @@ const analyticDashboard = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch analytics data" });
   }
 };
+
 
 const getPropertyByAgentId = async (req, res) => {
   try {
