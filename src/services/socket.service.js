@@ -78,13 +78,11 @@ socket.on("sendMessage", async ({ senderId, content, propertyId, receiverId }) =
     const populatedMessage = await Message.findById(newMessage._id)
       .populate("senderId", "name profileImage")
       .populate("receiverId", "name profileImage")
-      .populate("propertyId", "title location price");
-    // Emit to specific rooms
-    io.to(`user_${finalReceiverId}`).emit("receiveMessage", populatedMessage); // Receiver
-    io.to(`user_${senderId}`).emit("receiveMessage", populatedMessage); // Sender
-    if (room) {
-      io.to(room).emit("receiveMessage", populatedMessage); // Property room
-    }
+      .populate("propertyId");
+    io.to(`user_${finalReceiverId}`).emit("receiveMessage", populatedMessage);
+    // if (room) {
+    //   io.to(room).emit("receiveMessage", populatedMessage); 
+    // }
     console.log(`Message sent from ${senderId} to ${finalReceiverId} in room: ${room || 'direct'}`);
   } catch (error) {
     console.error("Error sending message:", error);
@@ -251,7 +249,7 @@ socket.on("sendMessage", async ({ senderId, content, propertyId, receiverId }) =
             .sort({ timestamp: 1 })
             .populate("senderId", "name profileImage")
             .populate("receiverId", "name profileImage")
-            .populate("propertyId", "title location price");
+            .populate("propertyId");
 
           socket.emit("previousChat", {
             success: true,
