@@ -1319,6 +1319,15 @@ const deleteAppointment = async (req, res) => {
 
 const analyticDashboard = async (req, res) => {
   try {
+    const baseQuery = { status: { $ne: "Draft" } };
+    
+    const approvedUsers = await User.find({
+      $or: [{ isAdmin: true }, { status: "Approved" }],
+    }).select("_id");
+    const approvedUserIds = approvedUsers.map((user) => user._id);
+    
+    baseQuery.createdBy = { $in: approvedUserIds };
+
     const topLikeProperties = await Likes.aggregate([
       { $group: { _id: "$propertyId", likeCount: { $sum: 1 } } },
       { $sort: { likeCount: -1 } },
@@ -1332,6 +1341,7 @@ const analyticDashboard = async (req, res) => {
         },
       },
       { $unwind: "$propertyDetails" },
+      { $match: { "propertyDetails.status": { $ne: "Draft" } } },
       {
         $project: {
           _id: 0,
@@ -1342,6 +1352,7 @@ const analyticDashboard = async (req, res) => {
     ]);
 
     const saleProperties = await Property.aggregate([
+      { $match: baseQuery },
       { 
         $lookup: {
           from: "propertylistingtypes",
@@ -1380,7 +1391,7 @@ const analyticDashboard = async (req, res) => {
       },
     ]);
 
-    const recentProperties = await Property.find({})
+    const recentProperties = await Property.find(baseQuery) 
       .sort({ createdAt: -1 })
       .limit(5)
       .populate('propertyType')
@@ -1389,13 +1400,19 @@ const analyticDashboard = async (req, res) => {
       .populate('createdBy')
       .populate('amenities');
 
-    const totalProperties = await Property.countDocuments();
-    
+    const totalProperties = await Property.countDocuments(baseQuery);
+
+    const totalSold = await Property.countDocuments({
+      ...baseQuery,
+      isSold: true
+    });
+
     const totalCustomers = await User.countDocuments({
       $or: [{ isSeller: true }, { isAgent: true }, { isBuyer: true }],
     });
 
     const totalSaleQuery = await Property.aggregate([
+      { $match: baseQuery }, 
       {
         $lookup: {
           from: "propertylistingtypes",
@@ -1411,6 +1428,7 @@ const analyticDashboard = async (req, res) => {
     const totalSale = totalSaleQuery.length > 0 ? totalSaleQuery[0].count : 0;
 
     const totalRentQuery = await Property.aggregate([
+      { $match: baseQuery },
       {
         $lookup: {
           from: "propertylistingtypes",
@@ -1426,6 +1444,7 @@ const analyticDashboard = async (req, res) => {
     const totalRent = totalRentQuery.length > 0 ? totalRentQuery[0].count : 0;
 
     const totalVacantQuery = await Property.aggregate([
+      { $match: baseQuery },
       {
         $lookup: {
           from: "propertylistingtypes",
@@ -1447,18 +1466,19 @@ const analyticDashboard = async (req, res) => {
       (total, property) => total + property.totalRevenue,
       0
     );
-    
+
     const totalIncome = saleProperties.reduce(
       (total, property) => total + property.totalIncome,
       0
     );
-    
+
     const totalExpenses = saleProperties.reduce(
       (total, property) => total + property.totalExpenses,
       0
     );
 
     const totalSocialSource = await Property.aggregate([
+      { $match: baseQuery },
       {
         $group: {
           _id: null,
@@ -1471,6 +1491,7 @@ const analyticDashboard = async (req, res) => {
       : 0;
 
     const monthlyAnalytics = await Property.aggregate([
+      { $match: baseQuery },
       {
         $lookup: {
           from: "propertylistingtypes",
@@ -1529,6 +1550,7 @@ const analyticDashboard = async (req, res) => {
       totalSale,
       totalRent,
       totalVacant,
+      totalSold,
       totalRevenue,
       totalIncome,
       totalExpenses,

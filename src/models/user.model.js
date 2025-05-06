@@ -9,10 +9,10 @@ const User = new Schema(
     email: {
       type: String,
     },
-    firstName:{
+    firstName: {
       type: String,
     },
-    lastName:{
+    lastName: {
       type: String,
     },
     phoneNo: {
@@ -70,7 +70,7 @@ const User = new Schema(
     fcmToken: {
       type: String,
     },
-    dob:{
+    dob: {
       type: Date,
     },
     phoneNumber: {
@@ -79,9 +79,10 @@ const User = new Schema(
     countryCode: {
       type: String,
     },
-    document:{
+    document: {
       type: String,
     },
+    rejectReason: { type: String },
     status: {
       type: String,
       enum: ["Pending", "Approved", "Rejected"],

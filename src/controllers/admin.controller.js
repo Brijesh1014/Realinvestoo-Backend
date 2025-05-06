@@ -140,19 +140,17 @@ const updateUserStatus = async (req, res) => {
     const { status, reason } = req.body;
 
     if (!["Approved", "Rejected"].includes(status)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Invalid status. Must be 'Approved' or 'Reject'",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status. Must be 'Approved' or 'Rejected'",
+      });
     }
 
     const adminUser = await User_Model.findById(adminId);
     if (!adminUser?.isAdmin) {
       return res
         .status(403)
-        .json({ success: false, message: "You do not have permission" });
+        .json({ success: false, message: "You do not have permission to perform this action" });
     }
 
     const user = await User_Model.findById(userId);
@@ -182,24 +180,30 @@ const updateUserStatus = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Document not uploaded" });
     }
-    user.status = status;
 
-    if (status === "Rejected" && user.document) {
-      user.document = null;
+    user.status = status;
+    
+    if (status === "Rejected") {
+      user.rejectReason = reason || "";
+      if (user.document) {
+        user.document = null;
+      }
+    } else if (status === "Approved") {
+      user.rejectReason = null;
     }
 
     await user.save();
 
-    user.status = status;
-    await user.save();
-
-    let notificationTitle = `Account ${status}`;
-    let notificationMessage =
-      status === "Approved"
-        ? "Your account has been approved! You can now add properties."
-        : reason
-        ? `Your account has been rejected. Reason: ${user.reason}`
+    const notificationTitle = `Account ${status}`;
+    let notificationMessage;
+    
+    if (status === "Approved") {
+      notificationMessage = "Your account has been approved! You can now add properties.";
+    } else {
+      notificationMessage = reason
+        ? `Your account has been rejected. Reason: ${reason}` 
         : "Your account has been rejected. Please contact support or upload correct documents.";
+    }
 
     await FCMService.sendNotificationToUser(
       adminId,

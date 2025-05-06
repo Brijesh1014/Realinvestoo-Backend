@@ -84,6 +84,7 @@ const propertySchema = new mongoose.Schema(
     propertyDocuments: { type: [String] },
     viewCount:{type:Number,default:0},
     status: { type: String },
+    isSold: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
