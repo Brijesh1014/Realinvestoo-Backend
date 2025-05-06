@@ -7,113 +7,93 @@ const initSocketIo = (io) => {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
-    socket.on("joinChat", ({ userId, propertyId }) => {
-      if (
-        userId &&
-        propertyId &&
-        mongoose.Types.ObjectId.isValid(propertyId) &&
-        mongoose.Types.ObjectId.isValid(userId)
-      ) {
-        const uniqueRoomId = `property_${propertyId}_user_${userId}`;
-        socket.join(uniqueRoomId);
-
-        socket.join(`user_${userId}`);
-
-        console.log(
-          `User ${userId} joined property chat room: ${uniqueRoomId}`
-        );
-
-        socket.emit("joinedChat", {
-          success: true,
-          roomId: uniqueRoomId,
-          message: "Successfully joined property chat",
-        });
-      } else {
-        socket.emit("error", {
-          message:
-            "Both valid userId and valid propertyId are required to join the chat.",
-        });
-      }
+socket.on("joinChat", ({ userId, propertyId }) => {
+  if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+    const userRoom = `user_${userId}`;
+    socket.join(userRoom);
+    console.log(`User ${userId} joined personal room: ${userRoom}`);
+    
+    if (propertyId && mongoose.Types.ObjectId.isValid(propertyId)) {
+      const uniqueRoomId = `property_${propertyId}_user_${userId}`;
+      socket.join(uniqueRoomId);
+      console.log(`User ${userId} joined property chat room: ${uniqueRoomId}`);
+      
+      socket.emit("joinedChat", {
+        success: true,
+        roomId: uniqueRoomId,
+        message: "Successfully joined property chat",
+      });
+    } else {
+      socket.emit("joinedChat", {
+        success: true,
+        roomId: userRoom,
+        message: "Successfully joined personal chat room",
+      });
+    }
+  } else {
+    socket.emit("error", {
+      message: "Valid userId is required to join the chat.",
     });
-
-    socket.on(
-      "sendMessage",
-      async ({ senderId, content, propertyId, receiverId }) => {
-        try {
-          if (!senderId || !content) {
-            socket.emit("error", {
-              message: "Sender ID and message content are required.",
-            });
-            return;
-          }
-
-          let finalReceiverId = receiverId;
-          let room;
-
-          if (propertyId && mongoose.Types.ObjectId.isValid(propertyId)) {
-            const property = await Property.findById(propertyId).select(
-              "createdBy"
-            );
-
-            if (!property) {
-              socket.emit("error", { message: "Property not found" });
-              return;
-            }
-
-            const propertyOwnerId = property.createdBy.toString();
-            finalReceiverId = propertyOwnerId;
-
-            const isOwnerSending = senderId === propertyOwnerId;
-
-            if (isOwnerSending && receiverId) {
-              room = `property_${propertyId}_user_${receiverId}`;
-            } else {
-              room = `property_${propertyId}_user_${senderId}`;
-            }
-          } else if (
-            receiverId &&
-            mongoose.Types.ObjectId.isValid(receiverId)
-          ) {
-            room = `user_${receiverId}`;
-          } else {
-            socket.emit("error", {
-              message: "Receiver ID or property ID required",
-            });
-            return;
-          }
-
-          const newMessage = new Message({
-            senderId,
-            receiverId: finalReceiverId,
-            content,
-            ...(propertyId ? { propertyId } : {}),
-            timestamp: new Date(),
-            isSeen: false,
-          });
-
-          await newMessage.save();
-
-          const populatedMessage = await Message.findById(newMessage._id)
-            .populate("senderId", "name profileImage")
-            .populate("receiverId", "name profileImage")
-            .populate("propertyId", "title location price");
-
-          io.to(room).emit("receiveMessage", populatedMessage);
-          io.to(finalReceiverId).emit("receiveMessage", populatedMessage);
-
-          io.to(`user_${senderId}`).emit("receiveMessage", populatedMessage);
-
-          console.log(`Message sent to room: ${room}`);
-        } catch (error) {
-          console.error("Error sending message:", error);
-          socket.emit("error", {
-            message: "Failed to send message",
-            error: error.message,
-          });
-        }
+  }
+})
+socket.on("sendMessage", async ({ senderId, content, propertyId, receiverId }) => {
+  try {
+    if (!senderId || !content) {
+      return socket.emit("error", {
+        message: "Sender ID and message content are required.",
+      });
+    }
+    let finalReceiverId = receiverId;
+    let room;
+    if (propertyId && mongoose.Types.ObjectId.isValid(propertyId)) {
+      const property = await Property.findById(propertyId).select("createdBy");
+      if (!property) {
+        return socket.emit("error", { message: "Property not found." });
       }
-    );
-
+      const propertyOwnerId = property.createdBy.toString();
+      const isOwnerSending = senderId === propertyOwnerId;
+      if (isOwnerSending && receiverId) {
+        room = `property_${propertyId}_user_${receiverId}`;
+        finalReceiverId = receiverId;
+      } else {
+        room = `property_${propertyId}_user_${senderId}`;
+        finalReceiverId = propertyOwnerId;
+      }
+    } else if (receiverId && mongoose.Types.ObjectId.isValid(receiverId)) {
+      room = `user_${receiverId}`;
+    } else {
+      return socket.emit("error", {
+        message: "Receiver ID or Property ID is required.",
+      });
+    }
+    const newMessage = new Message({
+      senderId,
+      receiverId: finalReceiverId,
+      content,
+      ...(propertyId ? { propertyId } : {}),
+      timestamp: new Date(),
+      isSeen: false,
+    });
+    await newMessage.save();
+    const populatedMessage = await Message.findById(newMessage._id)
+      .populate("senderId", "name profileImage")
+      .populate("receiverId", "name profileImage")
+      .populate("propertyId", "title location price");
+    // Emit to specific rooms
+    io.to(`user_${finalReceiverId}`).emit("receiveMessage", populatedMessage); // Receiver
+    io.to(`user_${senderId}`).emit("receiveMessage", populatedMessage); // Sender
+    if (room) {
+      io.to(room).emit("receiveMessage", populatedMessage); // Property room
+    }
+    console.log(`Message sent from ${senderId} to ${finalReceiverId} in room: ${room || 'direct'}`);
+  } catch (error) {
+    console.error("Error sending message:", error);
+    socket.emit("error", {
+      message: "Failed to send message",
+      error: error.message,
+    });
+  }
+});
     socket.on(
       "markMessagesAsSeen",
       async ({ userId, chatPartnerId, propertyId }) => {
