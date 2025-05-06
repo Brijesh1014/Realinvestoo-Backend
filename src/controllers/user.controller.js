@@ -61,6 +61,7 @@ const editProfile = async (req, res) => {
       isSeller,
       firstName,
       lastName,
+      countryCode,
       dob,
     } = req.body;
 
@@ -84,6 +85,7 @@ const editProfile = async (req, res) => {
       dob,
       firstName,
       lastName,
+      countryCode
     };
 
     let profileImageUrl;
