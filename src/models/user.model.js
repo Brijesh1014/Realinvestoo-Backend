@@ -85,7 +85,7 @@ const User = new Schema(
     rejectReason: { type: String },
     status: {
       type: String,
-      enum: ["Pending", "Approved", "Rejected"],
+      enum: ["Pending", "Approved", "Rejected","Re-Upload"],
       default: "Pending",
     },
   },
