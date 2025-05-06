@@ -99,6 +99,7 @@ const initSocketIo = (io) => {
             .populate("propertyId", "title location price");
 
           io.to(room).emit("receiveMessage", populatedMessage);
+          io.to(finalReceiverId).emit("receiveMessage", populatedMessage);
 
           io.to(`user_${senderId}`).emit("receiveMessage", populatedMessage);
 
