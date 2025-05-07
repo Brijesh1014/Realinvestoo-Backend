@@ -209,7 +209,7 @@ const getUserById = async (req, res) => {
       }
       return res.status(200).json({
         success: true,
-        message: "Get user successful",
+        message: "Get user successfully",
         data: user,
       });
     }

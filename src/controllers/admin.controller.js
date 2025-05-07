@@ -60,7 +60,7 @@ const getAllUsers = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Get users successful",
+      message: "Get users successfully",
       data: users,
       meta: {
         totalUsersCount,
