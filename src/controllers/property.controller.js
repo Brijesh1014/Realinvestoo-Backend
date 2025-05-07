@@ -265,7 +265,6 @@ const getAllProperties = async (req, res) => {
 
     if (isFeatured === "true") query.featured = true;
     else if (isFeatured === "false") query.featured = false;
-
     if (rentOrSale) {
       query.rentOrSale = rentOrSale;
     }
@@ -311,7 +310,6 @@ const getAllProperties = async (req, res) => {
       };
     }
 
-    // ✅ Add user status + visibility filter BEFORE count
     const approvedUsers = await User.find({
       $or: [{ isAdmin: true }, { status: "Approved" }],
     }).select("_id");
@@ -320,26 +318,65 @@ const getAllProperties = async (req, res) => {
     query.status = { $ne: "Draft" };
     query.createdBy = { $in: approvedUserIds };
 
-    // ✅ Pagination setup
     const pageNumber = parseInt(page);
     const pageSize = parseInt(limit);
     const skip = (pageNumber - 1) * pageSize;
 
-    // ✅ Accurate counts using final query
     const totalProperties = await Property.countDocuments(query);
-    const saleProperties = await Property.countDocuments({
-      ...query,
-      rentOrSale: "Sale",
-    });
-    const rentProperties = await Property.countDocuments({
-      ...query,
-      rentOrSale: "Rent",
-    });
-    const vacantProperties = await Property.countDocuments({
-      ...query,
-      rentOrSale: { $ne: "Sale" },
-      visible: true,
-    });
+    const totalSold = await Property.countDocuments({ ...query, isSold: true });
+
+    const saleCountAgg = await Property.aggregate([
+      { $match: query },
+      {
+        $lookup: {
+          from: "propertylistingtypes",
+          localField: "listingType",
+          foreignField: "_id",
+          as: "listingTypeDetails",
+        },
+      },
+      { $unwind: "$listingTypeDetails" },
+      { $match: { "listingTypeDetails.name": "Sale" } },
+      { $count: "count" },
+    ]);
+    const saleProperties = saleCountAgg[0]?.count || 0;
+
+    const rentCountAgg = await Property.aggregate([
+      { $match: query },
+      {
+        $lookup: {
+          from: "propertylistingtypes",
+          localField: "listingType",
+          foreignField: "_id",
+          as: "listingTypeDetails",
+        },
+      },
+      { $unwind: "$listingTypeDetails" },
+      { $match: { "listingTypeDetails.name": "Rent" } },
+      { $count: "count" },
+    ]);
+    const rentProperties = rentCountAgg[0]?.count || 0;
+
+    const vacantCountAgg = await Property.aggregate([
+      { $match: query },
+      {
+        $lookup: {
+          from: "propertylistingtypes",
+          localField: "listingType",
+          foreignField: "_id",
+          as: "listingTypeDetails",
+        },
+      },
+      { $unwind: "$listingTypeDetails" },
+      {
+        $match: {
+          "listingTypeDetails.name": { $ne: "Sale" },
+          visible: true,
+        },
+      },
+      { $count: "count" },
+    ]);
+    const vacantProperties = vacantCountAgg[0]?.count || 0;
 
     const properties = await Property.find(query)
       .skip(skip)
@@ -379,6 +416,7 @@ const getAllProperties = async (req, res) => {
         totalPages,
         remainingPages,
         pageSize: properties.length,
+        totalSold,
       },
     });
   } catch (error) {
@@ -423,18 +461,18 @@ const getAllOwnProperties = async (req, res) => {
       furnishingStatus,
       legalStatus,
       ownershipStatus,
-      status
+      status,
     } = req.query;
-    
+
     const userId = req.userId;
-    const query = { createdBy: userId }; // apply owner filter from the beginning
+    const query = { createdBy: userId };
 
     if (location) query.address = { $regex: location, $options: "i" };
 
     if (type) {
       const typeDoc = await PropertyType.findOne({ name: new RegExp(`^${type}$`, "i") });
       if (typeDoc) query.propertyType = typeDoc._id;
-      else query._id = { $in: [] }; // no match
+      else query._id = { $in: [] };
     }
 
     if (listingType) {
@@ -514,13 +552,9 @@ const getAllOwnProperties = async (req, res) => {
     const pageSize = parseInt(limit);
     const skip = (pageNumber - 1) * pageSize;
 
-    // Count total properties *after* query is finalized
-    const [totalProperties, saleProperties, rentProperties, vacantProperties, properties] =
+    const [totalProperties, properties] =
       await Promise.all([
         Property.countDocuments(query),
-        Property.countDocuments({ ...query, rentOrSale: "Sale" }),
-        Property.countDocuments({ ...query, rentOrSale: "Rent" }),
-        Property.countDocuments({ ...query, rentOrSale: { $ne: "Sale" }, visible: true }),
         Property.find(query)
           .skip(skip)
           .limit(pageSize)
@@ -531,7 +565,59 @@ const getAllOwnProperties = async (req, res) => {
           .populate("amenities")
           .sort({ createdAt: -1 }),
       ]);
-
+      const saleCountAgg = await Property.aggregate([
+        { $match: query },
+        {
+          $lookup: {
+            from: "propertylistingtypes",
+            localField: "listingType",
+            foreignField: "_id",
+            as: "listingTypeDetails",
+          },
+        },
+        { $unwind: "$listingTypeDetails" },
+        { $match: { "listingTypeDetails.name": "Sale" } },
+        { $count: "count" },
+      ]);
+      const saleProperties = saleCountAgg[0]?.count || 0;
+  
+      const rentCountAgg = await Property.aggregate([
+        { $match: query },
+        {
+          $lookup: {
+            from: "propertylistingtypes",
+            localField: "listingType",
+            foreignField: "_id",
+            as: "listingTypeDetails",
+          },
+        },
+        { $unwind: "$listingTypeDetails" },
+        { $match: { "listingTypeDetails.name": "Rent" } },
+        { $count: "count" },
+      ]);
+      const rentProperties = rentCountAgg[0]?.count || 0;
+  
+      const vacantCountAgg = await Property.aggregate([
+        { $match: query },
+        {
+          $lookup: {
+            from: "propertylistingtypes",
+            localField: "listingType",
+            foreignField: "_id",
+            as: "listingTypeDetails",
+          },
+        },
+        { $unwind: "$listingTypeDetails" },
+        {
+          $match: {
+            "listingTypeDetails.name": { $ne: "Sale" },
+            visible: true,
+          },
+        },
+        { $count: "count" },
+      ]);
+      const vacantProperties = vacantCountAgg[0]?.count || 0;
+      const totalSold = await Property.countDocuments({ ...query, isSold: true });
     if (req.userId) {
       const userLikes = await Likes.find({ userId: req.userId }).select("propertyId isLike");
       const likeMap = {};
@@ -557,6 +643,7 @@ const getAllOwnProperties = async (req, res) => {
         totalPages,
         remainingPages,
         pageSize: properties.length,
+        totalSold,
       },
     });
   } catch (error) {
