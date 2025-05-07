@@ -28,7 +28,8 @@ const register = async (req, res) => {
       firstName,
       lastName,
       dob,
-      document
+      document,
+      countryCode
     } = req.body;
 
     const existingUser = await User_Model.findOne({ email });
@@ -74,7 +75,8 @@ const register = async (req, res) => {
       dob,
       firstName,
       lastName,
-      document
+      document,
+      countryCode
     });
 
     await newUser.save();
