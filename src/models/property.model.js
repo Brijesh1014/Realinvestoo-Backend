@@ -85,6 +85,7 @@ const propertySchema = new mongoose.Schema(
     viewCount:{type:Number,default:0},
     status: { type: String },
     isSold: { type: Boolean, default: false },
+    ownerId:{ type: mongoose.Schema.Types.ObjectId, ref: "User" }
   },
   { timestamps: true }
 );
