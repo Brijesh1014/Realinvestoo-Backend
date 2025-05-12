@@ -380,7 +380,7 @@ const initSocketIo = (io) => {
         ]);
 
         const userProperties = await Property.find({
-          createdBy: objectIdUserId,
+          ownerId: objectIdUserId,
         })
           .select("_id")
           .lean();

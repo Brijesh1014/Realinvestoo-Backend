@@ -28,7 +28,7 @@ const createProperty = async (req, res) => {
       city,
       zipcode,
       amenities,
-      propertiesFacing 
+      propertiesFacing,
     } = req.body;
 
     const missingFields = [];
@@ -316,7 +316,7 @@ const getAllProperties = async (req, res) => {
     const approvedUserIds = approvedUsers.map((user) => user._id);
 
     query.status = { $ne: "Draft" };
-    query.createdBy = { $in: approvedUserIds };
+    query.ownerId = { $in: approvedUserIds };
 
     const pageNumber = parseInt(page);
     const pageSize = parseInt(limit);
@@ -384,6 +384,7 @@ const getAllProperties = async (req, res) => {
       .populate("propertyType")
       .populate("listingType")
       .populate("createdBy")
+      .populate("ownerId")
       .populate("agent")
       .populate("amenities")
       .sort({ createdAt: -1 });
@@ -465,7 +466,7 @@ const getAllOwnProperties = async (req, res) => {
     } = req.query;
 
     const userId = req.userId;
-    const query = { createdBy: userId };
+    const query = { ownerId: userId };
 
     if (location) query.address = { $regex: location, $options: "i" };
 
@@ -561,6 +562,7 @@ const getAllOwnProperties = async (req, res) => {
           .populate("propertyType")
           .populate("listingType")
           .populate("createdBy")
+          .populate("ownerId")
           .populate("agent")
           .populate("amenities")
           .sort({ createdAt: -1 }),
@@ -663,7 +665,8 @@ const getPropertyById = async (req, res) => {
       .populate("listingType")
       .populate("agent")
       .populate("amenities")
-      .populate("createdBy");
+      .populate("createdBy")
+      .populate("ownerId")
 
     if (!property) {
       return res.status(404).json({
@@ -723,7 +726,7 @@ const updateProperty = async (req, res) => {
       });
     }
 
-    if (!req.isAdmin && property.createdBy.toString() !== userId) {
+    if (!req.isAdmin && property.createdBy.toString() !== userId && property.ownerId.toString() !== userId) {
       return res.status(403).json({
         success: false,
         message: "You do not have permission to update this property.",
