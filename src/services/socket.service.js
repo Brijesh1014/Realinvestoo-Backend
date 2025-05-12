@@ -569,13 +569,7 @@ const initSocketIo = (io) => {
             $project: {
               propertyId: "$_id.property",
               userId: "$_id.otherUser",
-              property: {
-                _id: "$property._id",
-                title: "$property.title",
-                location: "$property.location",
-                price: "$property.price",
-                createdBy: "$property.createdBy",
-              },
+              property: "$property", // Changed to include the entire property object
               userDetails: {
                 name: "$userDetails.name",
                 profileImage: "$userDetails.profileImage",
@@ -590,7 +584,7 @@ const initSocketIo = (io) => {
           { $sort: { lastMessageTime: -1 } },
           {
             $match: {
-              "property.createdBy": { $ne: objectIdUserId },
+              "property.ownerId": { $ne: objectIdUserId },
             },
           },
         ]);
