@@ -57,7 +57,9 @@ const propertySchema = new mongoose.Schema(
     details: { type: String },
     price: { type: Number },
     currency: { type: String, default: "USD" },
-    amenities: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Amenities" },] },
+    amenities: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Amenities" }],
+    },
     featured: { type: Boolean, default: false },
     visible: { type: Boolean, default: true },
     new: { type: Boolean, default: false },
@@ -82,10 +84,24 @@ const propertySchema = new mongoose.Schema(
     sliderPhotos: { type: [String] },
     floorPlanUpload: { type: [String] },
     propertyDocuments: { type: [String] },
-    viewCount:{type:Number,default:0},
+    viewCount: { type: Number, default: 0 },
     status: { type: String },
     isSold: { type: Boolean, default: false },
-    ownerId:{ type: mongoose.Schema.Types.ObjectId, ref: "User" }
+    ownerId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    boostPlan: [
+      {
+        plan: { type: mongoose.Schema.Types.ObjectId, ref: "BoostPlan" },
+        expiryDate: { type: Date },
+      },
+    ],
+    subscriptionPlan: [
+      {
+        plan: { type: mongoose.Schema.Types.ObjectId, ref: "subscriptionPlan" },
+        expiryDate: { type: Date },
+      },
+    ],
+
+    expiryDate: { type: Date },
   },
   { timestamps: true }
 );
