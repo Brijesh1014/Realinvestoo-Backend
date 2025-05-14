@@ -164,6 +164,7 @@ router.delete(
   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.deletePropertyType
 );
+router.post("/boostProperty",  auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),propertyController.boostProperty)
 
 
 module.exports = router;

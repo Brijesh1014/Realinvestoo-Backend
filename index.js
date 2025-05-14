@@ -27,11 +27,19 @@ const cmsPageRoute = require("./src/routes/cmsPage.route")
 const bannerPlanRoute = require("./src/routes/bannerPlan.route")
 const boostPlanRoute = require("./src/routes/boostPlan.route")
 const subscriptionPlanRoute = require("./src/routes/subscriptionPlan.route")
+const webhookRoute = require("./src/routes/stripeWebhook.route")
 const initSocketIo = require("./src/services/socket.service");
 
 app.set("view engine", "ejs");
 const viewsDir = path.join(__dirname, "./src/views");
 app.set("views", viewsDir);
+
+app.post(
+  "/stripe",
+  express.raw({ type: "application/json" }),
+  webhookRoute 
+
+);
 
 const staticDir = path.join(__dirname, "public");
 app.use(express.static(staticDir));

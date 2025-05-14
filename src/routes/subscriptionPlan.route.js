@@ -8,5 +8,6 @@ router.get("/getAllSubscriptionPlans",  auth(["isSeller", "isAdmin", "isBuyer", 
 router.get("/getSubscriptionPlanById/:id",  auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]), subscriptionPlanController.getSubscriptionPlanById);
 router.put("/updateSubscriptionPlan/:id",  auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]), subscriptionPlanController.updateSubscriptionPlan);
 router.delete("/deleteSubscriptionPlan/:id",  auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]), subscriptionPlanController.deleteSubscriptionPlan);
+router.post("/purchaseSubscribePlan",  auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),subscriptionPlanController.purchaseSubscribePlan)
 
 module.exports = router;

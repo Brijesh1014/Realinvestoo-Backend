@@ -1,4 +1,6 @@
 const SubscriptionPlan = require("../models/subscriptionPlan.model");
+const PaymentHistory = require("../models/paymentHistory.model");
+const createStripeSubscription = require("../utils/createStripeSubscription");
 
 const createSubscriptionPlan = async (req, res) => {
   try {
@@ -52,10 +54,54 @@ const deleteSubscriptionPlan = async (req, res) => {
   }
 };
 
+const purchaseSubscribePlan = async (req, res) => {
+  try {
+    const { planId } = req.body;
+    const userId = req.userId;
+
+    const plan = await SubscriptionPlan.findById({_id:planId});
+    
+    if (!plan || !plan.stripePriceId) {
+      return res.status(400).json({success:false, message: "Invalid plan or stripe in not add a plan" });
+    }
+
+    const result = await createStripeSubscription({
+      userId,
+      priceId: plan.stripePriceId,
+      metadata: { planId },
+    });
+
+    await PaymentHistory.create({
+      user_id: userId,
+      related_type: "subscription",
+      SubscriptionProperty: planId,
+      stripe_customer_id: result.stripeCustomerId,
+      stripe_payment_intent_id: result.clientSecret,
+      stripe_subscription_id: result.stripeSubscriptionId,
+      amount: plan.price,
+      status: "pending",
+    });
+
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "Payment intent created for subscribe plan.",
+        clientSecret: result.clientSecret,
+      });
+  } catch (error) {
+    console.error("Error in boostProperty:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Server error", error: error.message });
+  }
+};
+
 module.exports={
     createSubscriptionPlan,
     getAllSubscriptionPlans,
     getSubscriptionPlanById,
     updateSubscriptionPlan,
-    deleteSubscriptionPlan
+    deleteSubscriptionPlan,
+    purchaseSubscribePlan
 }

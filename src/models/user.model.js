@@ -85,9 +85,19 @@ const User = new Schema(
     rejectReason: { type: String },
     status: {
       type: String,
-      enum: ["Pending", "Approved", "Rejected","Re-Upload"],
+      enum: ["Pending", "Approved", "Rejected", "Re-Upload"],
       default: "Pending",
     },
+    stripeCustomerId: { type: String },
+    subscription: [
+      {
+        plan: { type: mongoose.Schema.Types.ObjectId, ref: "SubscriptionPlan" },
+        stripeSubscriptionId: { type: String },
+        startDate: { type: Date },
+        endDate: { type: Date },
+        propertiesCreated: { type: Number, default: 0 },
+      },
+    ],
   },
   { timestamps: true }
 );

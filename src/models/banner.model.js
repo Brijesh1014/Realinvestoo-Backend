@@ -10,6 +10,10 @@ const bannerSchema = mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
+    status: { type: String },
+    isPaid:{type:Boolean,default:false},
+    planId: { type: mongoose.Schema.Types.ObjectId, ref: "BannerPlan" },
+    expiryDate: { type: Date },
   },
   { timestamps: true }
 );

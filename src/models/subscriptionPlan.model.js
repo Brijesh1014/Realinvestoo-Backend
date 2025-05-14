@@ -9,6 +9,8 @@ const subscriptionPlanSchema = new mongoose.Schema(
     description: { type: String },
     feature: { type: String },
     status: { type: String },
+    stripePriceId: { type: String },
+    propertyLimit: { type: Number, required: true },
   },
   { timestamps: true }
 );
