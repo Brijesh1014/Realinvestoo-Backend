@@ -3,7 +3,7 @@ const bannerController = require("../controllers/banner.controller");
 const router = express.Router();
 const auth = require("../middlewares/auth.middleware");
 
-router.post("/createBanner", auth(["isAdmin"]), bannerController.createBanner);
+router.post("/createBanner",   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]), bannerController.createBanner);
 router.get(
   "/getAllBanners",
   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
