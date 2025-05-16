@@ -16,6 +16,11 @@ router.get(
   propertyController.getAllProperties
 );
 router.get(
+  "/getTopRatedProperties",
+  auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
+  propertyController.getTopRatedProperties
+);
+router.get(
   "/getAllOwnProperties",
   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.getAllOwnProperties

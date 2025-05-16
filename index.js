@@ -1,6 +1,7 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
+const cron = require("node-cron");
 const path = require("path");
 dotenv.config();
 require("./src/config/db.connection");
@@ -29,23 +30,20 @@ const boostPlanRoute = require("./src/routes/boostPlan.route")
 const subscriptionPlanRoute = require("./src/routes/subscriptionPlan.route")
 const webhookRoute = require("./src/routes/stripeWebhook.route")
 const initSocketIo = require("./src/services/socket.service");
-
+const bodyParser = require("body-parser");
+const { startBannerExpiryJob,startBoostExpiryJob } = require("./src/services/scheduleCronJobs");
 app.set("view engine", "ejs");
 const viewsDir = path.join(__dirname, "./src/views");
 app.set("views", viewsDir);
 
-app.post(
-  "/stripe",
-  express.raw({ type: "application/json" }),
-  webhookRoute 
-
-);
-
 const staticDir = path.join(__dirname, "public");
 app.use(express.static(staticDir));
 app.use(cors({ origin: "*" }));
+
+app.use("/stripe", webhookRoute);
 app.use(express.json({ limit: "550mb" }));
 app.use(express.urlencoded({ limit: "550mb", extended: true }));
+app.use(bodyParser.urlencoded({ extended: false }));
 
 app.get("/", async function (req, res) {
   return res.send(
@@ -77,6 +75,12 @@ app.use("/boostPlan", boostPlanRoute);
 app.use("/subscriptionPlan", subscriptionPlanRoute);
 const server = app.listen(PORT, () => {
   console.log(`Server up and running on port ${PORT}!`);
+});
+
+cron.schedule('* * * * *', () => {
+startBannerExpiryJob();
+startBoostExpiryJob()
+  console.log('Cron job is running every minute');
 });
 
 const io = require("socket.io")(server, {

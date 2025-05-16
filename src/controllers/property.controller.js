@@ -44,14 +44,6 @@ const createProperty = async (req, res) => {
     if (!zipcode) missingFields.push("zipcode");
     if (!amenities) missingFields.push("amenities");
 
-    const user = await User.findById(req.userId);
-    if (user.isBuyer) {
-      return res.status(400).json({
-        success: false,
-        message: "Buyers are not allowed to create properties.",
-      });
-    }
-
     if (missingFields.length > 0) {
       return res.status(400).json({
         success: false,
@@ -59,20 +51,60 @@ const createProperty = async (req, res) => {
       });
     }
 
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    if (user.isAdmin) {
+      return createPropertyForAdmin(user, req, res);
+    }
+
+    if (user.isBuyer) {
+      return res.status(403).json({
+        success: false,
+        message: "Buyers are not allowed to create properties.",
+      });
+    }
+
+    if (user.status !== "Approved") {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Your account must be approved before you can create a property.",
+      });
+    }
+
+    const existingProperties = await Property.countDocuments({
+      createdBy: req.userId,
+    });
+    const activeSubscription = user.subscription?.find((sub) => {
+      return new Date(sub.endDate) >= new Date();
+    });
+
+    if (!activeSubscription && existingProperties >= 1) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "You have reached the free limit. Please subscribe to a plan to create more properties.",
+      });
+    }
+
     const existingPropertyType = await PropertyType.findById(propertyType);
     if (!existingPropertyType) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid property type",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid property type" });
     }
 
     const existingListingType = await PropertyListingType.findById(listingType);
     if (!existingListingType) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid listing type",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid listing type" });
     }
 
     const existingAmenities = await Amenities.find({ _id: { $in: amenities } });
@@ -92,10 +124,9 @@ const createProperty = async (req, res) => {
         isAgent: true,
       });
       if (!agentExists) {
-        return res.status(400).json({
-          success: false,
-          message: "Agent not found",
-        });
+        return res
+          .status(400)
+          .json({ success: false, message: "Agent not found" });
       }
     }
 
@@ -114,16 +145,46 @@ const createProperty = async (req, res) => {
 
     const propertyData = await propertyDetails.save();
 
-    const isApproved = user.status === "Approved" || user.isAdmin;
     return res.status(201).json({
       success: true,
-      message: isApproved
-        ? "Property created successfully"
-        : "Property created successfully, but it won't be listed as your account is not approved yet.",
+      message: "Property created successfully.",
       data: propertyData,
     });
   } catch (error) {
     console.error("Error creating property: ", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create property",
+      error: error.message,
+    });
+  }
+};
+
+const createPropertyForAdmin = async (user, req, res) => {
+  try {
+
+    const propertyDetails = new Property({
+      createdBy: req.userId,
+      ...req.body,
+    });
+
+    const senderId = req.userId;
+    const message = `Check out the latest property: ${propertyDetails.propertyName}`;
+    await FCMService.sendNotificationToAdmin(
+      senderId,
+      propertyDetails.propertyName,
+      message
+    );
+
+    const propertyData = await propertyDetails.save();
+
+    return res.status(201).json({
+      success: true,
+      message: "Property created successfully by admin.",
+      data: propertyData,
+    });
+  } catch (error) {
+    console.error("Error creating property for admin: ", error);
     return res.status(500).json({
       success: false,
       message: "Failed to create property",
@@ -196,6 +257,7 @@ const getAllProperties = async (req, res) => {
       furnishingStatus,
       legalStatus,
       ownershipStatus,
+      isBoost,
     } = req.query;
 
     const query = {};
@@ -273,6 +335,7 @@ const getAllProperties = async (req, res) => {
     if (bestOffer) query.bestOffer = true;
     if (upcoming) query.new = true;
     if (recommended) query.recommended = true;
+    if (isBoost) query.isBoost = true;
 
     if (isFeatured === "true") query.featured = true;
     else if (isFeatured === "false") query.featured = false;
@@ -443,6 +506,48 @@ const getAllProperties = async (req, res) => {
   }
 };
 
+const getTopRatedProperties = async (req, res) => {
+  try {
+    const now = new Date();
+
+    const boostedProps = await Property.find({
+      isBoost: true,
+      "boostPlan.expiryDate": { $gte: now },
+      status: { $ne: "Draft" },
+    })
+      .populate("propertyType listingType amenities ownerId boostPlan.plan")
+      .lean();
+
+    if (boostedProps.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No boosted properties available",
+        data: [],
+      });
+    }
+
+    const dayIndex =
+      Math.floor(now.getTime() / (1000 * 60 * 60 * 24)) % boostedProps.length;
+    const rotatedList = [
+      ...boostedProps.slice(dayIndex),
+      ...boostedProps.slice(0, dayIndex),
+    ];
+
+    return res.status(200).json({
+      success: true,
+      message: "Top-rated boosted properties fetched successfully",
+      data: rotatedList,
+    });
+  } catch (error) {
+    console.error("Error fetching top-rated properties:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch top-rated properties",
+      error: error.message,
+    });
+  }
+};
+
 const getAllOwnProperties = async (req, res) => {
   try {
     const {
@@ -476,6 +581,7 @@ const getAllOwnProperties = async (req, res) => {
       legalStatus,
       ownershipStatus,
       status,
+      isBoost
     } = req.query;
 
     const userId = req.userId;
@@ -526,6 +632,7 @@ const getAllOwnProperties = async (req, res) => {
     if (kitchen) query.kitchen = kitchen;
     if (parking) query.parking = parking;
     if (status) query.status = status;
+    if (isBoost) query.isBoost = true;
 
     if (legalStatus) query.legalStatus = legalStatus;
     if (ownershipStatus) query.ownershipStatus = ownershipStatus;
@@ -2158,4 +2265,5 @@ module.exports = {
   deleteFile,
   getAllOwnProperties,
   boostProperty,
+  getTopRatedProperties,
 };

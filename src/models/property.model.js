@@ -94,6 +94,7 @@ const propertySchema = new mongoose.Schema(
         expiryDate: { type: Date },
       },
     ],
+    isBoost:{type:Boolean,default:false},
     subscriptionPlan: [
       {
         plan: { type: mongoose.Schema.Types.ObjectId, ref: "subscriptionPlan" },

@@ -29,6 +29,7 @@ const paymentHistorySchema = new mongoose.Schema(
     stripe_payment_intent_id: { type: String },
     stripe_subscription_id: { type: String },
     stripe_invoice_id: { type: String },
+  stripe_checkout_session_id:{type:String},
 
     amount: { type: Number, required: true },
     currency: { type: String, default: "usd" },

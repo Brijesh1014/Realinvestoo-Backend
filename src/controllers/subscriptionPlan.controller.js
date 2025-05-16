@@ -1,14 +1,47 @@
 const SubscriptionPlan = require("../models/subscriptionPlan.model");
 const PaymentHistory = require("../models/paymentHistory.model");
 const createStripeSubscription = require("../utils/createStripeSubscription");
+require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const createSubscriptionPlan = async (req, res) => {
   try {
-    const plan = new SubscriptionPlan(req.body);
+    const { name, price, duration, description } = req.body;
+
+    const stripeProduct = await stripe.products.create({
+      name,
+      description: description || "",
+    });
+
+    const stripePrice = await stripe.prices.create({
+      unit_amount: Math.round(price * 100),
+      currency: "usd",
+      recurring: {
+        interval: "month",
+        interval_count: duration || 1,
+      },
+      product: stripeProduct.id,
+    });
+
+    const plan = new SubscriptionPlan({
+      ...req.body,
+      stripePriceId: stripePrice.id,
+    });
+
     await plan.save();
-    res.status(201).json({ success :true,message: "Subscription plan created successfully", plan });
+
+    res.status(201).json({
+      success: true,
+      message: "Subscription plan created successfully",
+      plan,
+    });
   } catch (error) {
-    res.status(500).json({success:false, message: "Failed to create subscription plan", error: error.message });
+    console.error("Error creating subscription plan:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to create subscription plan",
+      error: error.message,
+    });
   }
 };
 
@@ -88,6 +121,9 @@ const purchaseSubscribePlan = async (req, res) => {
         success: true,
         message: "Payment intent created for subscribe plan.",
         clientSecret: result.clientSecret,
+        stripeSubscriptionId:result.stripeSubscriptionId,
+        isSetupIntent:result.isSetupIntent,
+        stripeCustomerId:result.stripeCustomerId
       });
   } catch (error) {
     console.error("Error in boostProperty:", error);

@@ -26,4 +26,9 @@ router.get(
   auth(["isBuyer", "isAdmin", "isSeller","isAgent"]),
   userController.getUserById
 );
+router.get(
+  "/getPaymentHistory",
+  auth(["isBuyer", "isAdmin", "isSeller","isAgent"]),
+  userController.getPaymentHistory
+);
 module.exports = router;

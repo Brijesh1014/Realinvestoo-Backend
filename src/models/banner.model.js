@@ -13,6 +13,7 @@ const bannerSchema = mongoose.Schema(
     status: { type: String },
     isPaid:{type:Boolean,default:false},
     planId: { type: mongoose.Schema.Types.ObjectId, ref: "BannerPlan" },
+    isExpired: { type: Boolean, default: false },
     expiryDate: { type: Date },
   },
   { timestamps: true }

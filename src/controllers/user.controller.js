@@ -4,6 +4,7 @@ const {
   cloudinary,
 } = require("../services/cloudinary.service");
 const FCMService = require("../services/notification.service");
+const PaymentHistory = require("../models/paymentHistory.model");
 
 const getAllAgents = async (req, res) => {
   try {
@@ -302,9 +303,45 @@ const uploadDocument = async (req, res) => {
 };
 
 
+
+const getPaymentHistory = async (req, res) => {
+  try {
+    const userId = req.userId; 
+
+    const { related_type, status } = req.query;
+
+    const filter = { user_id: userId };
+
+    if (related_type) filter.related_type = related_type;
+    if (status) filter.status = status;
+
+    const history = await PaymentHistory.find(filter)
+      .populate("banner", "title image") 
+      .populate("BoostProperty", "propertyName mainPhoto")
+      .populate("SubscriptionProperty", "name") 
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      message: "Payment history fetched successfully",
+      data: history,
+    });
+  } catch (error) {
+    console.error("Error fetching payment history:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+
+
+
 module.exports = {
   getAllAgents,
   editProfile,
   getUserById,
   uploadDocument,
+  getPaymentHistory
 };
