@@ -2,6 +2,7 @@ const User_Model = require("../models/user.model");
 const Property_Model = require("../models/property.model");
 const { cloudinary } = require("../services/cloudinary.service");
 const FCMService = require("../services/notification.service");
+const PaymentHistory = require("../models/paymentHistory.model");
 
 const getAllUsers = async (req, res) => {
   try {
@@ -150,7 +151,10 @@ const updateUserStatus = async (req, res) => {
     if (!adminUser?.isAdmin) {
       return res
         .status(403)
-        .json({ success: false, message: "You do not have permission to perform this action" });
+        .json({
+          success: false,
+          message: "You do not have permission to perform this action",
+        });
     }
 
     const user = await User_Model.findById(userId);
@@ -167,12 +171,10 @@ const updateUserStatus = async (req, res) => {
     }
 
     if (user.status === status) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: `User is already ${status.toLowerCase()}`,
-        });
+      return res.status(400).json({
+        success: false,
+        message: `User is already ${status.toLowerCase()}`,
+      });
     }
 
     if (status === "Approved" && !user.document) {
@@ -182,7 +184,7 @@ const updateUserStatus = async (req, res) => {
     }
 
     user.status = status;
-    
+
     if (status === "Rejected") {
       user.rejectReason = reason || "";
       if (user.document) {
@@ -196,12 +198,13 @@ const updateUserStatus = async (req, res) => {
 
     const notificationTitle = `Account ${status}`;
     let notificationMessage;
-    
+
     if (status === "Approved") {
-      notificationMessage = "Your account has been approved! You can now add properties.";
+      notificationMessage =
+        "Your account has been approved! You can now add properties.";
     } else {
       notificationMessage = reason
-        ? `Your account has been rejected. Reason: ${reason}` 
+        ? `Your account has been rejected. Reason: ${reason}`
         : "Your account has been rejected. Please contact support or upload correct documents.";
     }
 
@@ -269,10 +272,68 @@ const getPendingDocumentUsers = async (req, res) => {
   }
 };
 
+const getUsersPaymentHistory = async (req, res) => {
+  try {
+    const { related_type, status, page = 1, limit = 10 } = req.query;
+
+    const filter = {};
+    if (related_type) filter.related_type = related_type;
+    if (status) filter.status = status;
+
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
+
+    const history = await PaymentHistory.find(filter)
+      .populate("banner", "title image")
+      .populate("boostProperty", "propertyName mainPhoto")
+      .populate("userId", "firstName lastName name email")
+      .populate("subscriptionProperty", "name")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(pageSize);
+
+    const totalPaymentHistory = await PaymentHistory.countDocuments(filter);
+    const totalSuccess = await PaymentHistory.countDocuments({
+      ...filter,
+      status: "succeeded",
+    });
+    const totalPending = await PaymentHistory.countDocuments({
+      ...filter,
+      status: "pending",
+    });
+
+    const totalPages = Math.ceil(totalPaymentHistory / pageSize);
+    const remainingPages = Math.max(0, totalPages - pageNumber);
+
+    res.status(200).json({
+      success: true,
+      message: "Payment history fetched successfully",
+      data: history,
+      meta: {
+        currentPage: pageNumber,
+        totalPages,
+        remainingPages,
+        totalRecords: totalPaymentHistory,
+        pageSize,
+        totalSuccess,
+        totalPending,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching payment history:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
   deleteUser,
   fetchAllUsers,
   updateUserStatus,
   getPendingDocumentUsers,
+  getUsersPaymentHistory,
 };

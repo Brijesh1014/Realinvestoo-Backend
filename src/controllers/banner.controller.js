@@ -60,7 +60,7 @@ const createBanner = async (req, res) => {
     });
 
     await PaymentHistory.create({
-      user_id: userId,
+      userId: userId,
       related_type: "banner",
       banner: banner._id,
       amount: price,

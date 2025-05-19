@@ -1,3 +1,4 @@
+const Property = require("../models/property.model");
 const User_Model = require("../models/user.model");
 const {
   uploadToCloudinary,
@@ -310,15 +311,15 @@ const getPaymentHistory = async (req, res) => {
 
     const { related_type, status } = req.query;
 
-    const filter = { user_id: userId };
+    const filter = { userId: userId };
 
     if (related_type) filter.related_type = related_type;
     if (status) filter.status = status;
 
     const history = await PaymentHistory.find(filter)
       .populate("banner", "title image") 
-      .populate("BoostProperty", "propertyName mainPhoto")
-      .populate("SubscriptionProperty", "name") 
+      .populate("boostProperty", "propertyName mainPhoto")
+      .populate("subscriptionProperty", "name") 
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -336,6 +337,61 @@ const getPaymentHistory = async (req, res) => {
 };
 
 
+const getUserBoostedProperties = async (req, res) => {
+  try {
+    const { userId } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+
+    const filter = {
+      isBoost: true,
+        ...(userId && { createdBy: userId }),
+    };
+
+    const skip = (page - 1) * limit;
+
+    const [total, boostedProperties] = await Promise.all([
+      Property.countDocuments(filter),
+      Property.find(filter)
+        .populate("propertyType", "name")
+        .populate("listingType", "name")
+        .populate("createdBy", "firstName lastName email")
+        .populate("boostPlan.plan", "title price duration")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+      if (!boostedProperties.length) {
+    return res.status(404).json({
+      success: false,
+      message: "No boosted properties found for the given criteria.",
+    });
+  }
+
+    return res.status(200).json({
+      success: true,
+      message: "Boosted properties fetched successfully.",
+      data: boostedProperties,
+      pagination: {
+        totalItems: total,
+        currentPage: page,
+        totalPages,
+        perPage: limit,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching boosted properties:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+
 
 
 module.exports = {
@@ -343,5 +399,6 @@ module.exports = {
   editProfile,
   getUserById,
   uploadDocument,
-  getPaymentHistory
+  getPaymentHistory,
+  getUserBoostedProperties
 };

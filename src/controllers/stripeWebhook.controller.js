@@ -57,8 +57,8 @@ const stripeWebhook = async (req, res) => {
       }
     }
 
-    if (history.related_type === "boost" && history.BoostProperty) {
-      const property = await Property.findById(history.BoostProperty);
+    if (history.related_type === "boost" && history.boostProperty) {
+      const property = await Property.findById(history.boostProperty);
       const boostPlan = await BoostPlan.findById(history.metadata?.boostPlanId || history.boostPlanId);
       if (property && boostPlan) {
         const expiryDate = new Date(Date.now() + boostPlan.duration * 24 * 60 * 60 * 1000);
@@ -79,8 +79,8 @@ const stripeWebhook = async (req, res) => {
     );
 
     if (history) {
-      const user = await User.findById(history.user_id);
-      const plan = await SubscriptionPlan.findById(history.SubscriptionProperty);
+      const user = await User.findById(history.userId);
+      const plan = await SubscriptionPlan.findById(history.subscriptionProperty);
       if (user && plan) {
         const now = new Date();
         const endDate = new Date(now);

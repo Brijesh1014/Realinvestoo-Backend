@@ -31,4 +31,9 @@ router.get(
   auth(["isBuyer", "isAdmin", "isSeller","isAgent"]),
   userController.getPaymentHistory
 );
+router.get(
+  "/getUserBoostedProperties",
+  auth(["isBuyer", "isAdmin", "isSeller","isAgent"]),
+  userController.getUserBoostedProperties
+);
 module.exports = router;

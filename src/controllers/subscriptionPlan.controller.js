@@ -105,9 +105,9 @@ const purchaseSubscribePlan = async (req, res) => {
     });
 
     await PaymentHistory.create({
-      user_id: userId,
+      userId: userId,
       related_type: "subscription",
-      SubscriptionProperty: planId,
+      subscriptionProperty: planId,
       stripe_customer_id: result.stripeCustomerId,
       stripe_payment_intent_id: result.clientSecret,
       stripe_subscription_id: result.stripeSubscriptionId,

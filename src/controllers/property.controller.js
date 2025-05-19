@@ -85,12 +85,14 @@ const createProperty = async (req, res) => {
       return new Date(sub.endDate) >= new Date();
     });
 
-    if (!activeSubscription && existingProperties >= 1) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "You have reached the free limit. Please subscribe to a plan to create more properties.",
-      });
+    let propertyStatus = "active";
+    if (existingProperties >= 1) {
+      if (!activeSubscription) {
+        propertyStatus = "draft";
+      }
+      else {
+        propertyStatus = "active";
+      }
     }
 
     const existingPropertyType = await PropertyType.findById(propertyType);
@@ -132,6 +134,7 @@ const createProperty = async (req, res) => {
 
     const propertyDetails = new Property({
       createdBy: req.userId,
+      status: propertyStatus,
       ...req.body,
     });
 
@@ -165,6 +168,7 @@ const createPropertyForAdmin = async (user, req, res) => {
 
     const propertyDetails = new Property({
       createdBy: req.userId,
+      status:"Active",
       ...req.body,
     });
 
@@ -2196,6 +2200,17 @@ const boostProperty = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Property not found." });
 
+    if (property.isBoost) {
+      return res.status(200).json({
+        success: true,
+        message: "This property is already boosted.",
+        data: {
+          propertyId,
+          boostPlanId,
+        },
+      });
+    }
+
     const { clientSecret, stripePaymentIntentId, stripeCustomerId } =
       await createPaymentIntent({
         userId,
@@ -2208,9 +2223,9 @@ const boostProperty = async (req, res) => {
       });
 
     await PaymentHistory.create({
-      user_id: userId,
+      userId: userId,
       related_type: "boost",
-      BoostProperty: propertyId,
+      boostProperty: propertyId,
       stripe_customer_id: stripeCustomerId,
       stripe_payment_intent_id: stripePaymentIntentId,
       amount: plan.offerPrice || plan.price,
