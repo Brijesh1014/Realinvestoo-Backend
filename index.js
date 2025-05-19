@@ -31,7 +31,7 @@ const subscriptionPlanRoute = require("./src/routes/subscriptionPlan.route")
 const webhookRoute = require("./src/routes/stripeWebhook.route")
 const initSocketIo = require("./src/services/socket.service");
 const bodyParser = require("body-parser");
-const { startBannerExpiryJob,startBoostExpiryJob } = require("./src/services/scheduleCronJobs");
+const { startBannerExpiryJob, startBoostExpiryJob, startSubscriptionExpiryJob } = require("./src/services/scheduleCronJobs");
 app.set("view engine", "ejs");
 const viewsDir = path.join(__dirname, "./src/views");
 app.set("views", viewsDir);
@@ -78,8 +78,10 @@ const server = app.listen(PORT, () => {
 });
 
 cron.schedule('* * * * *', () => {
-startBannerExpiryJob();
-startBoostExpiryJob()
+  startBannerExpiryJob();
+  startBoostExpiryJob();
+  startSubscriptionExpiryJob();
+  startSubscriptionExpiryJob()
   console.log('Cron job is running every minute');
 });
 

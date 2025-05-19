@@ -1,6 +1,7 @@
 const SubscriptionPlan = require("../models/subscriptionPlan.model");
 const PaymentHistory = require("../models/paymentHistory.model");
-const createStripeSubscription = require("../utils/createStripeSubscription");
+const  createStripeSubscription  = require("../utils/createStripeSubscription");
+const User = require("../models/user.model");
 require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
@@ -87,52 +88,113 @@ const deleteSubscriptionPlan = async (req, res) => {
   }
 };
 
+
 const purchaseSubscribePlan = async (req, res) => {
   try {
     const { planId } = req.body;
     const userId = req.userId;
-
-    const plan = await SubscriptionPlan.findById({_id:planId});
     
-    if (!plan || !plan.stripePriceId) {
-      return res.status(400).json({success:false, message: "Invalid plan or stripe in not add a plan" });
+    if (!planId) {
+      return res.status(400).json({
+        success: false,
+        message: "Plan ID is required",
+      });
+    }
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
     }
 
+    const plan = await SubscriptionPlan.findById(planId);
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: "Subscription plan not found",
+      });
+    }
+    
+    if (!plan.stripePriceId) {
+      return res.status(400).json({
+        success: false,
+        message: "Stripe price ID not configured for this plan",
+      });
+    }
+    
+    // Check if plan is active
+    // if (plan.status !== "active") {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "This subscription plan is not available for purchase",
+    //   });
+    // }
+
+    const metadata = {
+      subscriptionPlanId: planId,
+      userId: userId,
+      planName: plan.name,
+      propertyLimit: plan.propertyLimit,
+      planDuration: plan.duration || 1, 
+    };
+
+  
     const result = await createStripeSubscription({
       userId,
       priceId: plan.stripePriceId,
-      metadata: { planId },
+      metadata,
     });
 
-    await PaymentHistory.create({
-      userId: userId,
+    if (!result || !result.clientSecret) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to create subscription",
+      });
+    }
+
+    const paymentRecord = await PaymentHistory.create({
+      userId,
       related_type: "subscription",
       subscriptionProperty: planId,
       stripe_customer_id: result.stripeCustomerId,
-      stripe_payment_intent_id: result.clientSecret,
       stripe_subscription_id: result.stripeSubscriptionId,
+      stripe_invoice_id: result.invoiceId,
       amount: plan.price,
+      currency: "usd",
       status: "pending",
+      metadata: JSON.stringify(metadata),
     });
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Payment intent created for subscribe plan.",
+    console.log(`Created payment record: ${paymentRecord._id} for plan: ${plan.name}`);
+
+    // Respond with subscription details
+    res.status(200).json({
+      success: true,
+      message: "Subscription created. Confirm payment on the client side.",
+      data: {
         clientSecret: result.clientSecret,
-        stripeSubscriptionId:result.stripeSubscriptionId,
+        subscriptionId: result.stripeSubscriptionId,
+        customerId: result.stripeCustomerId,
         isSetupIntent:result.isSetupIntent,
-        stripeCustomerId:result.stripeCustomerId
-      });
+        planDetails: {
+          name: plan.name,
+          price: plan.price,
+          duration: plan.duration || 1,
+          propertyLimit: plan.propertyLimit,
+        }
+      }
+    });
   } catch (error) {
-    console.error("Error in boostProperty:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Server error", error: error.message });
+    console.error("Error in purchaseSubscribePlan:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while processing subscription purchase",
+      error: error.message,
+    });
   }
 };
-
 module.exports={
     createSubscriptionPlan,
     getAllSubscriptionPlans,

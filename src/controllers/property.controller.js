@@ -15,6 +15,7 @@ const PropertyView = require("../models/propertyViewCount.model");
 const BoostPlan = require("../models/boostPlan.model");
 const PaymentHistory = require("../models/paymentHistory.model");
 const createPaymentIntent = require("../utils/createPaymentIntent");
+const SubscriptionService = require("../services/subscription.service");
 
 const createProperty = async (req, res) => {
   try {
@@ -81,17 +82,19 @@ const createProperty = async (req, res) => {
     const existingProperties = await Property.countDocuments({
       createdBy: req.userId,
     });
-    const activeSubscription = user.subscription?.find((sub) => {
-      return new Date(sub.endDate) >= new Date();
-    });
-
-    let propertyStatus = "active";
-    if (existingProperties >= 1) {
-      if (!activeSubscription) {
-        propertyStatus = "draft";
+    
+    const activeSubscription = user.subscriptionPlanIsActive
+    let propertyStatus = "Active";
+    
+    if (activeSubscription) {
+      const totalPropertyLimit = user.propertyLimit || 1;
+      
+      if (existingProperties >= totalPropertyLimit) {
+        propertyStatus = "Draft";
       }
-      else {
-        propertyStatus = "active";
+    } else {
+      if (existingProperties >= 1) {
+        propertyStatus = "Draft";
       }
     }
 
@@ -148,10 +151,16 @@ const createProperty = async (req, res) => {
 
     const propertyData = await propertyDetails.save();
 
+    let responseMessage = "Property created successfully.";
+    if (propertyStatus === "Draft") {
+      responseMessage = "Property created successfully but set to Draft status. Purchase a subscription plan to activate all your Draft properties.";
+    }
+    
     return res.status(201).json({
       success: true,
-      message: "Property created successfully.",
+      message: responseMessage,
       data: propertyData,
+      status: propertyStatus
     });
   } catch (error) {
     console.error("Error creating property: ", error);
