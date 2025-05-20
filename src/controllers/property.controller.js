@@ -82,13 +82,13 @@ const createProperty = async (req, res) => {
     const existingProperties = await Property.countDocuments({
       createdBy: req.userId,
     });
-    
-    const activeSubscription = user.subscriptionPlanIsActive
+
+    const activeSubscription = user.subscriptionPlanIsActive;
     let propertyStatus = "Active";
-    
+
     if (activeSubscription) {
       const totalPropertyLimit = user.propertyLimit || 1;
-      
+
       if (existingProperties >= totalPropertyLimit) {
         propertyStatus = "Draft";
       }
@@ -153,14 +153,15 @@ const createProperty = async (req, res) => {
 
     let responseMessage = "Property created successfully.";
     if (propertyStatus === "Draft") {
-      responseMessage = "Property created successfully but set to Draft status. Purchase a subscription plan to activate all your Draft properties.";
+      responseMessage =
+        "Property created successfully but set to Draft status. Purchase a subscription plan to activate all your Draft properties.";
     }
-    
+
     return res.status(201).json({
       success: true,
       message: responseMessage,
       data: propertyData,
-      status: propertyStatus
+      status: propertyStatus,
     });
   } catch (error) {
     console.error("Error creating property: ", error);
@@ -174,10 +175,9 @@ const createProperty = async (req, res) => {
 
 const createPropertyForAdmin = async (user, req, res) => {
   try {
-
     const propertyDetails = new Property({
       createdBy: req.userId,
-      status:"Active",
+      status: "Active",
       ...req.body,
     });
 
@@ -253,7 +253,6 @@ const getAllProperties = async (req, res) => {
       parking,
       amenities,
       search,
-      topRated,
       bestOffer,
       upcoming,
       recommended,
@@ -271,6 +270,7 @@ const getAllProperties = async (req, res) => {
       legalStatus,
       ownershipStatus,
       isBoost,
+      status,
     } = req.query;
 
     const query = {};
@@ -344,7 +344,6 @@ const getAllProperties = async (req, res) => {
       ];
     }
 
-    if (topRated) query.ratings = { $gte: 4 };
     if (bestOffer) query.bestOffer = true;
     if (upcoming) query.new = true;
     if (recommended) query.recommended = true;
@@ -402,7 +401,7 @@ const getAllProperties = async (req, res) => {
     }).select("_id");
     const approvedUserIds = approvedUsers.map((user) => user._id);
 
-    query.status = { $ne: "Draft" };
+    if (status) query.status = status;
     query.ownerId = { $in: approvedUserIds };
 
     const pageNumber = parseInt(page);
@@ -594,11 +593,14 @@ const getAllOwnProperties = async (req, res) => {
       legalStatus,
       ownershipStatus,
       status,
-      isBoost
+      isBoost,
     } = req.query;
 
     const userId = req.userId;
-    const query = { ownerId: userId };
+    const query = {};
+    if (!req.isAdmin) {
+      query.ownerId = userId;
+    }
 
     if (location) query.address = { $regex: location, $options: "i" };
 
@@ -2204,6 +2206,7 @@ const boostProperty = async (req, res) => {
         .json({ success: false, message: "Boost plan not found." });
 
     const property = await Property.findById(propertyId);
+    console.log("property: ", property);
     if (!property)
       return res
         .status(404)
@@ -2235,11 +2238,13 @@ const boostProperty = async (req, res) => {
       userId: userId,
       related_type: "boost",
       boostProperty: propertyId,
+      boostPlanId: boostPlanId,
       stripe_customer_id: stripeCustomerId,
       stripe_payment_intent_id: stripePaymentIntentId,
       amount: plan.offerPrice || plan.price,
       currency: "usd",
       status: "pending",
+      metadata: { boostPlanId },
     });
 
     return res.status(200).json({

@@ -20,6 +20,10 @@ const paymentHistorySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Property",
     },
+    boostPlanId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BoostPlan",
+    },
     subscriptionProperty: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SubscriptionPlan",

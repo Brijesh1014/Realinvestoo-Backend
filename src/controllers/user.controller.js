@@ -339,7 +339,7 @@ const getPaymentHistory = async (req, res) => {
 
 const getUserBoostedProperties = async (req, res) => {
   try {
-    const { userId } = req.query;
+    const userId  = req.userId;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
 
