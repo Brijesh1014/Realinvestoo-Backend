@@ -1,6 +1,6 @@
 const SubscriptionPlan = require("../models/subscriptionPlan.model");
 const PaymentHistory = require("../models/paymentHistory.model");
-const  createStripeSubscription  = require("../utils/createStripeSubscription");
+const createStripeSubscription = require("../utils/createStripeSubscription");
 const User = require("../models/user.model");
 require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
@@ -49,157 +49,169 @@ const createSubscriptionPlan = async (req, res) => {
 const getAllSubscriptionPlans = async (req, res) => {
   try {
     const plans = await SubscriptionPlan.find();
-    res.status(200).json({success:true, message: "Fetched all subscription plans", plans });
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "Fetched all subscription plans",
+        plans,
+      });
   } catch (error) {
-    res.status(500).json({success:false, message: "Failed to fetch subscription plans", error: error.message });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to fetch subscription plans",
+        error: error.message,
+      });
   }
 };
 
 const getSubscriptionPlanById = async (req, res) => {
   try {
     const plan = await SubscriptionPlan.findById(req.params.id);
-    if (!plan) return res.status(404).json({success:false, message: "Subscription plan not found" });
+    if (!plan)
+      return res
+        .status(404)
+        .json({ success: false, message: "Subscription plan not found" });
 
-    res.status(200).json({success:true, message: "Fetched subscription plan", plan });
+    res
+      .status(200)
+      .json({ success: true, message: "Fetched subscription plan", plan });
   } catch (error) {
-    res.status(500).json({success:false, message: "Failed to fetch subscription plan", error: error.message });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to fetch subscription plan",
+        error: error.message,
+      });
   }
 };
 
 const updateSubscriptionPlan = async (req, res) => {
   try {
-    const plan = await SubscriptionPlan.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!plan) return res.status(404).json({ success:false,message: "Subscription plan not found" });
+    const plan = await SubscriptionPlan.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    if (!plan)
+      return res
+        .status(404)
+        .json({ success: false, message: "Subscription plan not found" });
 
-    res.status(200).json({success:true, message: "Subscription plan updated successfully", plan });
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "Subscription plan updated successfully",
+        plan,
+      });
   } catch (error) {
-    res.status(500).json({ success:false,message: "Failed to update subscription plan", error: error.message });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to update subscription plan",
+        error: error.message,
+      });
   }
 };
 
 const deleteSubscriptionPlan = async (req, res) => {
   try {
     const plan = await SubscriptionPlan.findByIdAndDelete(req.params.id);
-    if (!plan) return res.status(404).json({success:false, message: "Subscription plan not found" });
+    if (!plan)
+      return res
+        .status(404)
+        .json({ success: false, message: "Subscription plan not found" });
 
-    res.status(200).json({success:true, message: "Subscription plan deleted successfully" });
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "Subscription plan deleted successfully",
+      });
   } catch (error) {
-    res.status(500).json({success:true, message: "Failed to delete subscription plan", error: error.message });
+    res
+      .status(500)
+      .json({
+        success: true,
+        message: "Failed to delete subscription plan",
+        error: error.message,
+      });
   }
 };
 
+// … other requires …
 
 const purchaseSubscribePlan = async (req, res) => {
   try {
     const { planId } = req.body;
     const userId = req.userId;
-    
-    if (!planId) {
-      return res.status(400).json({
-        success: false,
-        message: "Plan ID is required",
-      });
-    }
-    
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
+    if (!planId) throw new Error("Plan ID is required");
 
-    const plan = await SubscriptionPlan.findById(planId);
-    if (!plan) {
-      return res.status(404).json({
-        success: false,
-        message: "Subscription plan not found",
-      });
-    }
-    
-    if (!plan.stripePriceId) {
-      return res.status(400).json({
-        success: false,
-        message: "Stripe price ID not configured for this plan",
-      });
-    }
-    
-    // Check if plan is active
-    // if (plan.status !== "active") {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "This subscription plan is not available for purchase",
-    //   });
-    // }
+    // Load user & plan
+    const [user, plan] = await Promise.all([
+      User.findById(userId),
+      SubscriptionPlan.findById(planId),
+    ]);
+    if (!user) throw new Error("User not found");
+    if (!plan || !plan.stripePriceId) throw new Error("Plan not found or missing Stripe price");
 
+    // Build metadata
     const metadata = {
       subscriptionPlanId: planId,
-      userId: userId,
+      userId,
       planName: plan.name,
       propertyLimit: plan.propertyLimit,
-      planDuration: plan.duration || 1, 
+      planDuration: plan.duration || 1,
     };
 
-  
-    const result = await createStripeSubscription({
+    // Create subscription
+    const {
+      stripeCustomerId,
+      stripeSubscriptionId,
+      invoiceId,
+      clientSecret,
+    } = await createStripeSubscription({
       userId,
       priceId: plan.stripePriceId,
       metadata,
     });
 
-    if (!result || !result.clientSecret) {
-      return res.status(500).json({
-        success: false,
-        message: "Failed to create subscription",
-      });
-    }
-
-    const paymentRecord = await PaymentHistory.create({
+    // Record it in your DB
+    await PaymentHistory.create({
       userId,
       related_type: "subscription",
       subscriptionProperty: planId,
-      stripe_customer_id: result.stripeCustomerId,
-      stripe_subscription_id: result.stripeSubscriptionId,
-      stripe_invoice_id: result.invoiceId,
+      stripe_customer_id: stripeCustomerId,
+      stripe_subscription_id: stripeSubscriptionId,
+      stripe_invoice_id: invoiceId,
       amount: plan.price,
       currency: "usd",
       status: "pending",
       metadata: JSON.stringify(metadata),
     });
 
-    console.log(`Created payment record: ${paymentRecord._id} for plan: ${plan.name}`);
-
-    // Respond with subscription details
+    // Send client_secret to the front end
     res.status(200).json({
       success: true,
-      message: "Subscription created. Confirm payment on the client side.",
-      data: {
-        clientSecret: result.clientSecret,
-        subscriptionId: result.stripeSubscriptionId,
-        customerId: result.stripeCustomerId,
-        isSetupIntent:result.isSetupIntent,
-        planDetails: {
-          name: plan.name,
-          price: plan.price,
-          duration: plan.duration || 1,
-          propertyLimit: plan.propertyLimit,
-        }
-      }
+      message: "Subscription created. Use clientSecret to confirm first payment.",
+      data: { clientSecret, subscriptionId: stripeSubscriptionId, customerId: stripeCustomerId },
     });
-  } catch (error) {
-    console.error("Error in purchaseSubscribePlan:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while processing subscription purchase",
-      error: error.message,
-    });
+  } catch (err) {
+    console.error("purchaseSubscribePlan error:", err);
+    res.status(400).json({ success: false, message: err.message });
   }
 };
-module.exports={
-    createSubscriptionPlan,
-    getAllSubscriptionPlans,
-    getSubscriptionPlanById,
-    updateSubscriptionPlan,
-    deleteSubscriptionPlan,
-    purchaseSubscribePlan
-}
+
+module.exports = {
+  createSubscriptionPlan,
+  getAllSubscriptionPlans,
+  getSubscriptionPlanById,
+  updateSubscriptionPlan,
+  deleteSubscriptionPlan,
+  purchaseSubscribePlan,
+};
