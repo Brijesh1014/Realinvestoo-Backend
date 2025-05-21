@@ -95,11 +95,15 @@ const User = new Schema(
         stripeSubscriptionId: { type: String },
         startDate: { type: Date },
         endDate: { type: Date },
-        isExpired:{type:Boolean}
+        isExpired: { type: Boolean },
       },
     ],
-    subscriptionPlanIsActive:{type:Boolean},
-            propertyLimit: { type: Number, default: 0 },
+    subscriptionPlanIsActive: { type: Boolean },
+    propertyLimit: { type: Number, default: 0 },
+    createdPropertiesCount: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );

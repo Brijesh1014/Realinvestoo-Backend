@@ -83,19 +83,20 @@ const createProperty = async (req, res) => {
       createdBy: req.userId,
     });
 
-    const activeSubscription = user.subscriptionPlanIsActive;
+    // Determine limit based on role or subscription
+    let totalPropertyLimit = 1;
     let propertyStatus = "Active";
 
-    if (activeSubscription) {
-      const totalPropertyLimit = user.propertyLimit || 1;
+    if (user.isAgent) {
+      totalPropertyLimit = 5;
+    } else if (user.isSeller) {
+      totalPropertyLimit = 3;
+    } else if (user.subscriptionPlanIsActive) {
+      totalPropertyLimit = user.propertyLimit || 1;
+    }
 
-      if (existingProperties >= totalPropertyLimit) {
-        propertyStatus = "Draft";
-      }
-    } else {
-      if (existingProperties >= 1) {
-        propertyStatus = "Draft";
-      }
+    if (existingProperties >= totalPropertyLimit) {
+      propertyStatus = "Draft";
     }
 
     const existingPropertyType = await PropertyType.findById(propertyType);
@@ -150,6 +151,9 @@ const createProperty = async (req, res) => {
     );
 
     const propertyData = await propertyDetails.save();
+    
+    user.createdPropertiesCount += 1;
+    await user.save();
 
     let responseMessage = "Property created successfully.";
     if (propertyStatus === "Draft") {
@@ -172,6 +176,7 @@ const createProperty = async (req, res) => {
     });
   }
 };
+
 
 const createPropertyForAdmin = async (user, req, res) => {
   try {

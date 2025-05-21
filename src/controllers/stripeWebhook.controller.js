@@ -4,8 +4,9 @@ const PaymentHistory = require("../models/paymentHistory.model");
 const Banner = require("../models/banner.model");
 const Property = require("../models/property.model");
 const BoostPlan = require("../models/boostPlan.model");
+const SubscriptionPlan = require("../models/subscriptionPlan.model");
 const User = require("../models/user.model");
-const StripeWebhookService = require("../services/stripeWebhook.service");
+const SubscriptionService = require("../services/subscription.service");
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 const stripeWebhook = async (req, res) => {
@@ -88,10 +89,37 @@ const stripeWebhook = async (req, res) => {
       }
     }
 
-    if (history.related_type === "subscription" && history.subscriptionProperty) {
+   if (history.related_type === "subscription" && history.subscriptionProperty) {
       const invoice = event.data.object;
       
-      const result = await StripeWebhookService.handleInvoicePaymentSucceeded(invoice);
+      try {
+        const subscriptionId = invoice.subscription;
+        if (!subscriptionId) {
+          console.error("No subscription ID found on invoice");
+          return;
+        }
+        
+        const user = await User.findById(history.userId);
+        const plan = await SubscriptionPlan.findById(history.subscriptionProperty);
+        
+        if (!user || !plan) {
+          console.error('User or subscription plan not found', { 
+            userId: history.userId, 
+            planId: history.subscriptionProperty 
+          });
+          return;
+        }
+        
+        console.log(`Processing subscription payment for user ${user._id} with plan ${plan._id}`);
+        
+        await SubscriptionService.manageSubscription(user, plan, subscriptionId);
+        const activatedCount = await SubscriptionService.activateDraftProperties(user);
+        await user.save();
+        
+        console.log(`Subscription updated for user ${user._id}. Property limit: ${user.propertyLimit}. Activated ${activatedCount} draft properties.`);
+      } catch (error) {
+        console.error(`Error in subscription payment processing: ${error.message}`);
+      }
     }
   }
 

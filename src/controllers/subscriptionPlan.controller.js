@@ -175,12 +175,13 @@ const purchaseSubscribePlan = async (req, res) => {
       stripeSubscriptionId,
       invoiceId,
       clientSecret,
+      paymentIntentId
     } = await createStripeSubscription({
       userId,
       priceId: plan.stripePriceId,
       metadata,
     });
-
+    
     // Record it in your DB
     await PaymentHistory.create({
       userId,
@@ -193,19 +194,21 @@ const purchaseSubscribePlan = async (req, res) => {
       currency: "usd",
       status: "pending",
       metadata: JSON.stringify(metadata),
+      stripe_payment_intent_id:paymentIntentId
     });
 
     // Send client_secret to the front end
     res.status(200).json({
       success: true,
       message: "Subscription created. Use clientSecret to confirm first payment.",
-      data: { clientSecret, subscriptionId: stripeSubscriptionId, customerId: stripeCustomerId },
+      data: { clientSecret, subscriptionId: stripeSubscriptionId, customerId: stripeCustomerId ,invoiceId:invoiceId},
     });
   } catch (err) {
     console.error("purchaseSubscribePlan error:", err);
     res.status(400).json({ success: false, message: err.message });
   }
 };
+
 
 module.exports = {
   createSubscriptionPlan,
