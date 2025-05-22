@@ -34,10 +34,9 @@ const createCategory = async (req, res) => {
 
 const getAllCategories = async (req, res) => {
   try {
-    const categories = await NewsCategory.find().populate(
-      "createdBy",
-      "username"
-    );
+    const categories = await NewsCategory.find()
+      .populate("createdBy", "username")
+      .sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
@@ -250,7 +249,8 @@ const getAllNews = async (req, res) => {
       .populate("category", "name")
       .populate("createdBy", "username")
       .skip(skip)
-      .limit(pageSize);
+      .limit(pageSize)
+      .sort({ createdAt: -1 });
 
     const totalPages = Math.ceil(totalNewsCount / pageSize);
     const remainingPages =
