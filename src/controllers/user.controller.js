@@ -200,39 +200,76 @@ const editProfile = async (req, res) => {
 const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
+    const isAdmin = req.isAdmin;
 
-    if (req.isAdmin) {
-      const user = await User_Model.findById(id);
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: "User not found",
-        });
-      }
-      return res.status(200).json({
-        success: true,
-        message: "Get user successfully",
-        data: user,
-      });
+    const baseQuery = { _id: id };
+    if (!isAdmin) {
+      baseQuery.$or = [
+        { isSeller: true },
+        { isBuyer: true },
+        { isAgent: true }
+      ];
     }
 
-    const user = await User_Model.findOne({
-      _id: id,
-      $or: [{ isSeller: true }, { isBuyer: true }, { isAgent: true }],
-    });
+    let user = await User_Model.findOne(baseQuery)
+      .populate({ path: 'subscription.plan', model: 'SubscriptionPlan' });
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found or not in allowed roles",
+        message: "User not found" + (!isAdmin ? " or not in allowed roles" : ""),
       });
     }
+
+    if (user.properties?.length > 0) {
+      await user.populate('properties');
+    }
+
+    const paymentHistory = await PaymentHistory.find({
+      userId: id,
+      status: 'succeeded'
+    })
+      .populate('banner')
+      .populate('boostPlanId')
+      .populate('subscriptionProperty')
+      .sort({ createdAt: -1 });
+
+    const groupPlans = (type) => paymentHistory.filter(plan => plan.related_type === type);
+    const isActive = (item) => item.end_date && new Date(item.end_date) > new Date();
+
+    const banners = groupPlans('banner');
+    const boosts = groupPlans('boost');
+    const subscriptions = groupPlans('subscription');
+
+    const activeBanners = banners.filter(isActive);
+    const activeBoosts = boosts.filter(isActive);
+    const activeSubscriptions = subscriptions.filter(isActive);
+
+    const subscriptionUsage = {
+      propertyLimit: user.propertyLimit || 0,
+      totalProperties: user.properties?.length || 0,
+      activeProperties: user.properties?.filter(p => p.status === 'Active').length || 0,
+      draftProperties: user.properties?.filter(p => p.status === 'Draft').length || 0
+    };
 
     return res.status(200).json({
       success: true,
       message: "Get user successful",
-      data: user,
+      data: {
+        ...user.toObject(),
+        purchasedPlans: {
+          banners,
+          activeBanners,
+          boosts,
+          activeBoosts,
+          subscriptions,
+          activeSubscriptions,
+          subscriptionUsage,
+          allPlans: paymentHistory
+        }
+      }
     });
+
   } catch (error) {
     console.error("Error fetching user by ID:", error);
     return res.status(500).json({
