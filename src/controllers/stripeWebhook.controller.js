@@ -47,7 +47,7 @@ const stripeWebhook = async (req, res) => {
       { status: "succeeded" },
       { new: true }
     );
-
+    
     if (!history) {
       console.log("No payment history found for payment intent:", intent.id);
       return res.status(200).send({ received: true });
@@ -90,14 +90,41 @@ const stripeWebhook = async (req, res) => {
     }
 
    if (history.related_type === "subscription" && history.subscriptionProperty) {
-      const invoice = event.data.object;
+      const paymentIntent = event.data.object;
       
       try {
-        const subscriptionId = invoice.subscription;
+        // Get subscription ID from the payment history record
+        const subscriptionId = history.stripe_subscription_id;
+        
         if (!subscriptionId) {
-          console.error("No subscription ID found on invoice");
-          return;
+          console.error("No subscription ID found in payment history record");
+          try {
+            if (history.stripe_customer_id) {
+              const subscriptions = await stripe.subscriptions.list({
+                customer: history.stripe_customer_id,
+                limit: 1
+              });
+              
+              if (subscriptions && subscriptions.data.length > 0) {
+                const latestSubscription = subscriptions.data[0];
+                // Update payment history with subscription ID
+                history.stripe_subscription_id = latestSubscription.id;
+                await history.save();
+                console.log(`Found subscription ID: ${latestSubscription.id} for customer: ${history.stripe_customer_id}`);
+              }
+            }
+          } catch (stripeError) {
+            console.error("Error retrieving subscription from Stripe:", stripeError);
+          }
+          
+          // If still no subscription ID, abort
+          if (!history.stripe_subscription_id) {
+            console.error("Could not find subscription ID anywhere");
+            return;
+          }
         }
+        
+        const subscriptionIdToUse = history.stripe_subscription_id;
         
         const user = await User.findById(history.userId);
         const plan = await SubscriptionPlan.findById(history.subscriptionProperty);
@@ -110,9 +137,9 @@ const stripeWebhook = async (req, res) => {
           return;
         }
         
-        console.log(`Processing subscription payment for user ${user._id} with plan ${plan._id}`);
+        console.log(`Processing subscription payment for user ${user._id} with plan ${plan._id} and subscription ID: ${subscriptionIdToUse}`);
         
-        await SubscriptionService.manageSubscription(user, plan, subscriptionId);
+        await SubscriptionService.manageSubscription(user, plan, subscriptionIdToUse);
         const activatedCount = await SubscriptionService.activateDraftProperties(user);
         await user.save();
         

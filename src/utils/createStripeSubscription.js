@@ -70,8 +70,8 @@ async function createStripeSubscription({ userId, priceId, metadata = {} }) {
     return {
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscription.id,
-      invoiceId: latestInvoiceId.id,
-      paymentIntentId: paymentIntent.id,
+      invoiceId: latestInvoiceId,
+      paymentIntentId: paymentIntent?.payment_intent?.id,
       clientSecret: paymentIntent?.payment_intent?.client_secret,
     };
   } catch (error) {
