@@ -79,26 +79,37 @@ const createProperty = async (req, res) => {
       });
     }
 
-    const existingProperties = await Property.countDocuments({
-      createdBy: req.userId,
-    });
+    // Count active properties separately from total properties
+    const [activePropertiesCount, totalPropertiesCount] = await Promise.all([
+      Property.countDocuments({
+        createdBy: req.userId,
+        status: 'Active'
+      }),
+      Property.countDocuments({
+        createdBy: req.userId
+      })
+    ]);
 
-    // Determine limit based on role or subscription
-    let totalPropertyLimit = 1;
-    let propertyStatus = "Active";
-
+    // Calculate user's property limit based on role or subscription
+    let basePropertyLimit = 1; // Default limit for all users
+    
+    // Role-based limits (only apply if no subscription or subscription limit is lower)
     if (user.isAgent) {
-      totalPropertyLimit = 5;
+      basePropertyLimit = 5; // Agents get 5 properties by default
     } else if (user.isSeller) {
-      totalPropertyLimit = 3;
-    } else if (user.subscriptionPlanIsActive) {
-      totalPropertyLimit = user.propertyLimit || 1;
+      basePropertyLimit = 3; // Sellers get 3 properties by default
     }
-
-    if (existingProperties >= totalPropertyLimit) {
+    
+    // If user has a subscription with a higher limit, use that instead
+    let effectivePropertyLimit = Math.max(basePropertyLimit, user.propertyLimit || 0);
+    
+    // Check if we've reached the property limit for active properties
+    let propertyStatus = "Active";
+    if (activePropertiesCount >= effectivePropertyLimit) {
       propertyStatus = "Draft";
     }
-
+    
+    // Validate property details
     const existingPropertyType = await PropertyType.findById(propertyType);
     if (!existingPropertyType) {
       return res
@@ -136,12 +147,14 @@ const createProperty = async (req, res) => {
       }
     }
 
+    // Create property with appropriate status
     const propertyDetails = new Property({
       createdBy: req.userId,
       status: propertyStatus,
       ...req.body,
     });
 
+    // Send notification to admin
     const senderId = req.userId;
     const message = `Check out the latest property: ${propertyDetails.propertyName}`;
     await FCMService.sendNotificationToAdmin(
@@ -150,15 +163,41 @@ const createProperty = async (req, res) => {
       message
     );
 
+    // Save property and update user property count
     const propertyData = await propertyDetails.save();
     
+    // Increment the total properties count
     user.createdPropertiesCount += 1;
+        user.propertyLimit -= 1;
+    
+    // If the property was created as Active, decrement the available property limit
+    // But ensure we don't go below zero for the limit (which shouldn't happen, but just as a safeguard)
+    if (propertyStatus === "Active" && user.propertyLimit > 0) {
+      // We don't reduce the base limit (which comes from role), only the additional limit from subscriptions
+      const baseLimit = user.isAgent ? 5 : (user.isSeller ? 3 : 1);
+      
+      // Only reduce if the limit is higher than the base limit
+      if (user.propertyLimit > baseLimit) {
+        user.propertyLimit -= 1;
+      }
+    }
+    
     await user.save();
 
+    // Prepare response message
     let responseMessage = "Property created successfully.";
+    let additionalInfo = null;
+    
     if (propertyStatus === "Draft") {
-      responseMessage =
-        "Property created successfully but set to Draft status. Purchase a subscription plan to activate all your Draft properties.";
+      responseMessage = "Property created successfully but set to Draft status.";
+      additionalInfo = {
+        reason: "Property limit reached",
+        activeLimit: effectivePropertyLimit,
+        activeCount: activePropertiesCount,
+        totalCount: totalPropertiesCount + 1, // Include the new property
+        subscriptionActive: user.subscriptionPlanIsActive || false,
+        upgradeTip: "Purchase a subscription plan to increase your property limit and activate Draft properties."
+      };
     }
 
     return res.status(201).json({
@@ -166,6 +205,7 @@ const createProperty = async (req, res) => {
       message: responseMessage,
       data: propertyData,
       status: propertyStatus,
+      additionalInfo
     });
   } catch (error) {
     console.error("Error creating property: ", error);
@@ -1079,6 +1119,15 @@ const deleteProperty = async (req, res) => {
         message: "Property not found",
       });
     }
+    
+    // Get the user who created the property
+    const user = await User.findById(property.createdBy);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Property owner not found",
+      });
+    }
 
     if (property.mainPhoto) {
       const mainPhotoPublicId = property.mainPhoto
@@ -1095,6 +1144,27 @@ const deleteProperty = async (req, res) => {
         return cloudinary.uploader.destroy(publicId);
       });
       await Promise.all(deletePromises);
+    }
+
+    // If this is an active property, increment the user's property limit
+    // We only increment if the property is active, as draft properties don't count against the limit
+    if (property.status === "Active") {
+      // Calculate the max limit based on role and subscription
+      const baseLimit = user.isAgent ? 5 : (user.isSeller ? 3 : 1);
+      const maxLimit = user.subscriptionPlanIsActive ? baseLimit + 10 : baseLimit; // Assuming max 10 additional properties from subscriptions
+      
+      // Only increment if we're not already at the maximum limit
+      if (user.propertyLimit < maxLimit) {
+        user.propertyLimit += 1;
+        console.log(`Increased property limit for user ${user._id} to ${user.propertyLimit} after deleting an active property`);
+        await user.save();
+      }
+    }
+    
+    // Decrement the total properties count for the user
+    if (user.createdPropertiesCount > 0) {
+      user.createdPropertiesCount -= 1;
+      await user.save();
     }
 
     await Property.findByIdAndDelete(req.params.id);
@@ -2246,8 +2316,8 @@ const boostProperty = async (req, res) => {
       boostPlanId: boostPlanId,
       stripe_customer_id: stripeCustomerId,
       stripe_payment_intent_id: stripePaymentIntentId,
-      amount: plan.offerPrice || plan.price,
-      currency: "usd",
+      amount: plan.offerPrice,
+      currency: "inr",
       status: "pending",
       metadata: { boostPlanId },
     });

@@ -127,6 +127,7 @@ const stripeWebhook = async (req, res) => {
         const subscriptionIdToUse = history.stripe_subscription_id;
         
         const user = await User.findById(history.userId);
+        console.log('history.userId: ', history.userId);
         const plan = await SubscriptionPlan.findById(history.subscriptionProperty);
         
         if (!user || !plan) {
@@ -139,9 +140,20 @@ const stripeWebhook = async (req, res) => {
         
         console.log(`Processing subscription payment for user ${user._id} with plan ${plan._id} and subscription ID: ${subscriptionIdToUse}`);
         
+        // First update the subscription and property limit
         await SubscriptionService.manageSubscription(user, plan, subscriptionIdToUse);
-        const activatedCount = await SubscriptionService.activateDraftProperties(user);
+        console.log('After manageSubscription - propertyLimit:', user.propertyLimit);
+        
+        // Save the user with the updated property limit
         await user.save();
+        console.log('After first save - propertyLimit:', user.propertyLimit);
+        
+        // Now activate draft properties if any
+        const activatedCount = await SubscriptionService.activateDraftProperties(user);
+        
+        // Save the user again after activating properties
+        await user.save();
+        console.log('After activateDraftProperties - propertyLimit:', user.propertyLimit);
         
         console.log(`Subscription updated for user ${user._id}. Property limit: ${user.propertyLimit}. Activated ${activatedCount} draft properties.`);
       } catch (error) {

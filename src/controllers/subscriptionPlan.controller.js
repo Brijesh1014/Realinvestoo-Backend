@@ -7,7 +7,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const createSubscriptionPlan = async (req, res) => {
   try {
-    const { name, price, duration, description } = req.body;
+    const { name, price, offerPrice,duration, description } = req.body;
 
     const stripeProduct = await stripe.products.create({
       name,
@@ -15,8 +15,8 @@ const createSubscriptionPlan = async (req, res) => {
     });
 
     const stripePrice = await stripe.prices.create({
-      unit_amount: Math.round(price * 100),
-      currency: "usd",
+      unit_amount: Math.round(offerPrice * 100),
+      currency: "inr",
       recurring: {
         interval: "month",
         interval_count: duration || 1,
@@ -190,8 +190,8 @@ const purchaseSubscribePlan = async (req, res) => {
       stripe_customer_id: stripeCustomerId,
       stripe_subscription_id: stripeSubscriptionId,
       stripe_invoice_id: invoiceId,
-      amount: plan.price,
-      currency: "usd",
+      amount: plan.offerPrice,
+      currency: "inr",
       status: "pending",
       metadata: JSON.stringify(metadata),
       stripe_payment_intent_id:paymentIntentId

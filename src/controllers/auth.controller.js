@@ -57,6 +57,14 @@ const register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    let propertyLimit
+    
+    if (isAgent) {
+      propertyLimit = 5; 
+    } else if (isSeller) {
+      propertyLimit = 3; 
+    }
+    
     const newUser = new User_Model({
       name,
       email,
@@ -76,7 +84,8 @@ const register = async (req, res) => {
       firstName,
       lastName,
       document,
-      countryCode
+      countryCode,
+      propertyLimit 
     });
 
     await newUser.save();

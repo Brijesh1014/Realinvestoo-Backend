@@ -20,7 +20,7 @@ const createPaymentIntent = async ({ userId, amount, relatedType, metadata }) =>
 
   const paymentIntent = await stripe.paymentIntents.create({
     amount: Math.round(amount * 100),
-    currency: "usd",
+    currency: "inr",
     customer: customerId,
     metadata: {
       userId,

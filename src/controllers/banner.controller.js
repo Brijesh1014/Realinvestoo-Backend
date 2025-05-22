@@ -47,7 +47,7 @@ const createBanner = async (req, res) => {
       planId,
     });
 
-    const price = bannerPlan.offerPrice || bannerPlan.price;
+    const price = bannerPlan.offerPrice
 
     const { clientSecret, stripeCustomerId, stripePaymentIntentId } = await createPaymentIntent({
       userId,
