@@ -11,6 +11,8 @@ const subscriptionPlanSchema = new mongoose.Schema(
     status: { type: String },
     stripePriceId: { type: String },
     propertyLimit: { type: Number, required: true },
+    billingInterval:{type:String,default : "month"},
+    currency:{type:String, default:"inr"}
   },
   { timestamps: true }
 );

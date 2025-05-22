@@ -7,7 +7,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const createSubscriptionPlan = async (req, res) => {
   try {
-    const { name, price, offerPrice,duration, description } = req.body;
+    const { name, price,billingInterval,currency, offerPrice,duration, description } = req.body;
 
     const stripeProduct = await stripe.products.create({
       name,
@@ -16,9 +16,9 @@ const createSubscriptionPlan = async (req, res) => {
 
     const stripePrice = await stripe.prices.create({
       unit_amount: Math.round(offerPrice * 100),
-      currency: "inr",
+      currency: currency || "inr",
       recurring: {
-        interval: "month",
+        interval: billingInterval || "month",
         interval_count: duration || 1,
       },
       product: stripeProduct.id,
@@ -48,7 +48,7 @@ const createSubscriptionPlan = async (req, res) => {
 
 const getAllSubscriptionPlans = async (req, res) => {
   try {
-    const plans = await SubscriptionPlan.find();
+    const plans = await SubscriptionPlan.find().sort({createdAt:-1});
     res
       .status(200)
       .json({

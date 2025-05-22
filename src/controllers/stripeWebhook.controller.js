@@ -11,13 +11,13 @@ const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 const stripeWebhook = async (req, res) => {
 
-  
+
   const sig = req.headers["stripe-signature"];
   if (!sig) {
     console.error("No Stripe signature found in headers");
     return res.status(400).send("No Stripe signature found");
   }
-  
+
   let event;
 
   try {
@@ -26,7 +26,7 @@ const stripeWebhook = async (req, res) => {
       console.error("Request body is not a Buffer as expected");
       return res.status(400).send("Webhook Error: Request body is not in the expected format");
     }
-    
+
     event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
     console.log("✅ Webhook signature verified successfully");
   } catch (err) {
@@ -40,14 +40,14 @@ const stripeWebhook = async (req, res) => {
 
   if (event.type === "payment_intent.succeeded") {
     console.log("Payment Intent Succeeded:", intent.id);
-    
+
     // Regular non-subscription payment intent handling
     const history = await PaymentHistory.findOneAndUpdate(
       { stripe_payment_intent_id: intent.id },
       { status: "succeeded" },
       { new: true }
     );
-    
+
     if (!history) {
       console.log("No payment history found for payment intent:", intent.id);
       return res.status(200).send({ received: true });
@@ -67,13 +67,13 @@ const stripeWebhook = async (req, res) => {
 
     if (history.related_type === "boost" && history.boostProperty) {
       console.log("Processing boost payment");
-      
+
       const property = await Property.findById(history.boostProperty);
 
       const boostPlanId = history.boostPlanId || history.metadata?.boostPlanId;
 
       const boostPlan = boostPlanId ? await BoostPlan.findById(boostPlanId) : null;
-      
+
       if (property && boostPlan) {
         const expiryDate = new Date(Date.now() + boostPlan.duration * 24 * 60 * 60 * 1000);
         property.boostPlan.push({ plan: boostPlan._id, expiryDate });
@@ -81,21 +81,20 @@ const stripeWebhook = async (req, res) => {
         await property.save();
         console.log(`Property ${property._id} boosted until ${expiryDate}`);
       } else {
-        console.error('Failed to process boost:', { 
-          propertyFound: !!property, 
-          boostPlanId: boostPlanId, 
-          boostPlanFound: !!boostPlan 
+        console.error('Failed to process boost:', {
+          propertyFound: !!property,
+          boostPlanId: boostPlanId,
+          boostPlanFound: !!boostPlan
         });
       }
     }
 
-   if (history.related_type === "subscription" && history.subscriptionProperty) {
+    if (history.related_type === "subscription" && history.subscriptionProperty) {
       const paymentIntent = event.data.object;
-      
+
       try {
-        // Get subscription ID from the payment history record
         const subscriptionId = history.stripe_subscription_id;
-        
+
         if (!subscriptionId) {
           console.error("No subscription ID found in payment history record");
           try {
@@ -104,10 +103,9 @@ const stripeWebhook = async (req, res) => {
                 customer: history.stripe_customer_id,
                 limit: 1
               });
-              
+
               if (subscriptions && subscriptions.data.length > 0) {
                 const latestSubscription = subscriptions.data[0];
-                // Update payment history with subscription ID
                 history.stripe_subscription_id = latestSubscription.id;
                 await history.save();
                 console.log(`Found subscription ID: ${latestSubscription.id} for customer: ${history.stripe_customer_id}`);
@@ -116,46 +114,36 @@ const stripeWebhook = async (req, res) => {
           } catch (stripeError) {
             console.error("Error retrieving subscription from Stripe:", stripeError);
           }
-          
-          // If still no subscription ID, abort
+
           if (!history.stripe_subscription_id) {
             console.error("Could not find subscription ID anywhere");
             return;
           }
         }
-        
+
         const subscriptionIdToUse = history.stripe_subscription_id;
-        
+
         const user = await User.findById(history.userId);
-        console.log('history.userId: ', history.userId);
         const plan = await SubscriptionPlan.findById(history.subscriptionProperty);
-        
+
         if (!user || !plan) {
-          console.error('User or subscription plan not found', { 
-            userId: history.userId, 
-            planId: history.subscriptionProperty 
+          console.error('User or subscription plan not found', {
+            userId: history.userId,
+            planId: history.subscriptionProperty
           });
           return;
         }
-        
-        console.log(`Processing subscription payment for user ${user._id} with plan ${plan._id} and subscription ID: ${subscriptionIdToUse}`);
-        
-        // First update the subscription and property limit
+
+
         await SubscriptionService.manageSubscription(user, plan, subscriptionIdToUse);
-        console.log('After manageSubscription - propertyLimit:', user.propertyLimit);
-        
-        // Save the user with the updated property limit
+
         await user.save();
-        console.log('After first save - propertyLimit:', user.propertyLimit);
-        
-        // Now activate draft properties if any
+
         const activatedCount = await SubscriptionService.activateDraftProperties(user);
-        
+
         // Save the user again after activating properties
         await user.save();
-        console.log('After activateDraftProperties - propertyLimit:', user.propertyLimit);
-        
-        console.log(`Subscription updated for user ${user._id}. Property limit: ${user.propertyLimit}. Activated ${activatedCount} draft properties.`);
+
       } catch (error) {
         console.error(`Error in subscription payment processing: ${error.message}`);
       }

@@ -79,36 +79,6 @@ const createProperty = async (req, res) => {
       });
     }
 
-    // Count active properties separately from total properties
-    const [activePropertiesCount, totalPropertiesCount] = await Promise.all([
-      Property.countDocuments({
-        createdBy: req.userId,
-        status: 'Active'
-      }),
-      Property.countDocuments({
-        createdBy: req.userId
-      })
-    ]);
-
-    // Calculate user's property limit based on role or subscription
-    let basePropertyLimit = 1; // Default limit for all users
-    
-    // Role-based limits (only apply if no subscription or subscription limit is lower)
-    if (user.isAgent) {
-      basePropertyLimit = 5; // Agents get 5 properties by default
-    } else if (user.isSeller) {
-      basePropertyLimit = 3; // Sellers get 3 properties by default
-    }
-    
-    // If user has a subscription with a higher limit, use that instead
-    let effectivePropertyLimit = Math.max(basePropertyLimit, user.propertyLimit || 0);
-    
-    // Check if we've reached the property limit for active properties
-    let propertyStatus = "Active";
-    if (activePropertiesCount >= effectivePropertyLimit) {
-      propertyStatus = "Draft";
-    }
-    
     // Validate property details
     const existingPropertyType = await PropertyType.findById(propertyType);
     if (!existingPropertyType) {
@@ -133,6 +103,12 @@ const createProperty = async (req, res) => {
           (id) => !existingAmenities.find((a) => a._id.toString() === id)
         ),
       });
+    }
+
+    let propertyStatus = "Active";
+    
+    if (user.propertyLimit === 0) {
+      propertyStatus = "Draft";
     }
 
     if (req.body.agent) {
@@ -163,40 +139,32 @@ const createProperty = async (req, res) => {
       message
     );
 
-    // Save property and update user property count
     const propertyData = await propertyDetails.save();
-    
-    // Increment the total properties count
-    user.createdPropertiesCount += 1;
-        user.propertyLimit -= 1;
-    
-    // If the property was created as Active, decrement the available property limit
-    // But ensure we don't go below zero for the limit (which shouldn't happen, but just as a safeguard)
-    if (propertyStatus === "Active" && user.propertyLimit > 0) {
-      // We don't reduce the base limit (which comes from role), only the additional limit from subscriptions
-      const baseLimit = user.isAgent ? 5 : (user.isSeller ? 3 : 1);
+
+    const totalPropertiesCount = user.createdPropertiesCount || 0;
+    user.createdPropertiesCount = totalPropertiesCount + 1;
+
+
+    if (user.propertyLimit > 0) {
       
-      // Only reduce if the limit is higher than the base limit
-      if (user.propertyLimit > baseLimit) {
-        user.propertyLimit -= 1;
-      }
+      user.propertyLimit -= 1;
     }
-    
+
     await user.save();
 
     // Prepare response message
     let responseMessage = "Property created successfully.";
     let additionalInfo = null;
-    
+
     if (propertyStatus === "Draft") {
-      responseMessage = "Property created successfully but set to Draft status.";
+      responseMessage =
+        "Property created successfully but set to Draft status.";
       additionalInfo = {
         reason: "Property limit reached",
-        activeLimit: effectivePropertyLimit,
-        activeCount: activePropertiesCount,
-        totalCount: totalPropertiesCount + 1, // Include the new property
+        currentLimit: user.propertyLimit,
         subscriptionActive: user.subscriptionPlanIsActive || false,
-        upgradeTip: "Purchase a subscription plan to increase your property limit and activate Draft properties."
+        upgradeTip:
+          "Purchase a subscription plan to increase your property limit and activate Draft properties.",
       };
     }
 
@@ -205,7 +173,7 @@ const createProperty = async (req, res) => {
       message: responseMessage,
       data: propertyData,
       status: propertyStatus,
-      additionalInfo
+      additionalInfo,
     });
   } catch (error) {
     console.error("Error creating property: ", error);
@@ -216,7 +184,6 @@ const createProperty = async (req, res) => {
     });
   }
 };
-
 
 const createPropertyForAdmin = async (user, req, res) => {
   try {
@@ -1119,7 +1086,6 @@ const deleteProperty = async (req, res) => {
         message: "Property not found",
       });
     }
-    
     // Get the user who created the property
     const user = await User.findById(property.createdBy);
     if (!user) {
@@ -1150,17 +1116,21 @@ const deleteProperty = async (req, res) => {
     // We only increment if the property is active, as draft properties don't count against the limit
     if (property.status === "Active") {
       // Calculate the max limit based on role and subscription
-      const baseLimit = user.isAgent ? 5 : (user.isSeller ? 3 : 1);
-      const maxLimit = user.subscriptionPlanIsActive ? baseLimit + 10 : baseLimit; // Assuming max 10 additional properties from subscriptions
-      
+      const baseLimit = user.isAgent ? 5 : user.isSeller ? 3 : 1;
+      const maxLimit = user.subscriptionPlanIsActive
+        ? baseLimit + 10
+        : baseLimit; // Assuming max 10 additional properties from subscriptions
+
       // Only increment if we're not already at the maximum limit
       if (user.propertyLimit < maxLimit) {
         user.propertyLimit += 1;
-        console.log(`Increased property limit for user ${user._id} to ${user.propertyLimit} after deleting an active property`);
+        console.log(
+          `Increased property limit for user ${user._id} to ${user.propertyLimit} after deleting an active property`
+        );
         await user.save();
       }
     }
-    
+
     // Decrement the total properties count for the user
     if (user.createdPropertiesCount > 0) {
       user.createdPropertiesCount -= 1;
