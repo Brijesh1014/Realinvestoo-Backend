@@ -12,7 +12,11 @@ const createBanner = async (req, res) => {
 
     const user = await User.findById(userId);
 
-    if (user && user.isAdmin) {
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    if (user.isAdmin) {
       const banner = await Banner.create({
         title,
         description,
@@ -29,8 +33,27 @@ const createBanner = async (req, res) => {
       });
     }
 
+    const existingBannerCount = await Banner.countDocuments({ createdBy: userId });
+
+    if (existingBannerCount === 0) {
+      const banner = await Banner.create({
+        title,
+        description,
+        link,
+        image,
+        createdBy: userId,
+        isPaid: true,
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: "First banner created for free.",
+        data: { banner },
+      });
+    }
+
     if (!planId) {
-      return res.status(400).json({ success: false, message: "Plan ID is required for non-admin users." });
+      return res.status(400).json({ success: false, message: "Plan ID is required for paid banners." });
     }
 
     const bannerPlan = await BannerPlan.findById(planId);
@@ -47,7 +70,7 @@ const createBanner = async (req, res) => {
       planId,
     });
 
-    const price = bannerPlan.offerPrice
+    const price = bannerPlan.offerPrice;
 
     const { clientSecret, stripeCustomerId, stripePaymentIntentId } = await createPaymentIntent({
       userId,
@@ -82,6 +105,7 @@ const createBanner = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
 
 
 
