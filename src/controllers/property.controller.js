@@ -2251,7 +2251,6 @@ const boostProperty = async (req, res) => {
         .json({ success: false, message: "Boost plan not found." });
 
     const property = await Property.findById(propertyId);
-    console.log("property: ", property);
     if (!property)
       return res
         .status(404)

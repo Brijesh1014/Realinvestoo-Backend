@@ -150,6 +150,46 @@ const stripeWebhook = async (req, res) => {
     }
   }
 
+  if (event.type === "invoice.paid") {
+  const invoice = event.data.object;
+  const subscriptionId = invoice.subscription;
+  const customerId = invoice.customer;
+
+  console.log(`🔁 Recurring payment successful for subscription: ${subscriptionId}`);
+
+  const user = await User.findOne({
+    stripeCustomerId: customerId,
+    stripeSubscriptionId: subscriptionId,
+  });
+
+  if (!user) {
+    console.error(`No user found for customerId=${customerId} and subscriptionId=${subscriptionId}`);
+    return res.status(200).send({ received: true });
+  }
+
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const priceId = subscription.items.data[0]?.price?.id;
+
+  if (!priceId) {
+    console.error(`No price ID found for subscription ${subscriptionId}`);
+    return res.status(200).send({ received: true });
+  }
+
+  const plan = await SubscriptionPlan.findOne({ priceId: priceId });
+
+  if (!plan) {
+    console.error(`No plan found with priceId: ${priceId}`);
+    return res.status(200).send({ received: true });
+  }
+
+  await SubscriptionService.manageSubscription(user, plan, subscriptionId);
+  await SubscriptionService.activateDraftProperties(user);
+  await user.save();
+
+  console.log(`✅ Subscription successfully extended for user ${user._id}`);
+}
+
+
 
   res.status(200).send({ received: true });
 };
