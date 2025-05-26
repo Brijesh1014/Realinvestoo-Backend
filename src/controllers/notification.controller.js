@@ -161,6 +161,30 @@ const deleteNotification = async (req, res) => {
     });
   }
 };
+const marksRead = async (req, res) => {
+  try {
+    const {ids} = req.body; 
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({success:false, message: 'Invalid or empty notification ID list.' });
+    }
+
+    const result = await Notification.updateMany(
+      { _id: { $in: ids } },
+      { $set: { isRead: true } }
+    );
+
+    return res.status(200).json({
+      success:true,
+      message: 'Notifications marked as read successfully.',
+      matchedCount: result.matchedCount || result.n, 
+      modifiedCount: result.modifiedCount || result.nModified
+    });
+  } catch (error) {
+    console.error('Error marking notifications as read:', error);
+    return res.status(500).json({ message: 'Server error while updating notifications.' });
+  }
+};
 
 module.exports = {
   getAllNotification,
@@ -168,4 +192,5 @@ module.exports = {
   getNotificationsBySenderId,
   getNotificationsByRecipientId,
   deleteNotification,
+  marksRead
 };

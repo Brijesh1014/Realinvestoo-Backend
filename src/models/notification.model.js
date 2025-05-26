@@ -11,6 +11,7 @@ const notificationSchema = new mongoose.Schema(
     },
     recipients: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     tokens: [String],
+    isRead:{type:Boolean,default:false,},
     successCount: { type: Number, default: 0 },
     failureCount: { type: Number, default: 0 },
   },

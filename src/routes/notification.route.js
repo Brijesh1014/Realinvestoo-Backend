@@ -31,5 +31,10 @@ router.delete(
   auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
   notificationController.deleteNotification
 );
+router.patch(
+  "/marksRead",
+  auth(["isBuyer", "isAdmin", "isSeller", "isAgent"]),
+  notificationController.marksRead
+);
 
 module.exports = router;
