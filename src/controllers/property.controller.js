@@ -106,7 +106,7 @@ const createProperty = async (req, res) => {
     }
 
     let propertyStatus = "Active";
-    
+
     if (user.propertyLimit === 0) {
       propertyStatus = "Draft";
     }
@@ -144,9 +144,7 @@ const createProperty = async (req, res) => {
     const totalPropertiesCount = user.createdPropertiesCount || 0;
     user.createdPropertiesCount = totalPropertiesCount + 1;
 
-
     if (user.propertyLimit > 0) {
-      
       user.propertyLimit -= 1;
     }
 
@@ -1612,7 +1610,6 @@ const deleteAppointment = async (req, res) => {
     });
   }
 };
-
 const analyticDashboard = async (req, res) => {
   try {
     const baseQuery = { status: { $ne: "Draft" } };
@@ -1765,12 +1762,10 @@ const analyticDashboard = async (req, res) => {
       (total, property) => total + property.totalRevenue,
       0
     );
-
     const totalIncome = saleProperties.reduce(
       (total, property) => total + property.totalIncome,
       0
     );
-
     const totalExpenses = saleProperties.reduce(
       (total, property) => total + property.totalExpenses,
       0
@@ -1838,6 +1833,225 @@ const analyticDashboard = async (req, res) => {
       return monthData;
     });
 
+
+    const {
+      months = [], 
+      years = [],
+      startCustom,
+      endCustom,
+    } = req.body;
+
+    const monthMap = {
+      Jan: 0,
+      Feb: 1,
+      Mar: 2,
+      March: 2,
+      Apr: 3,
+      May: 4,
+      Jun: 5,
+      Jul: 6,
+      Aug: 7,
+      Sep: 8,
+      Oct: 9,
+      Nov: 10,
+      Dec: 11,
+    };
+
+    const filterBySelectedMonths = (dataArray, selectedMonths) =>
+      selectedMonths.map((month) => {
+        const index = monthMap[month];
+        return index !== undefined ? dataArray[index] : 0;
+      });
+
+    /** ------- Monthly Payments ------- **/
+    const monthlyPayments = await PaymentHistory.aggregate([
+      {
+        $match: {
+          status: "succeeded",
+          createdAt: {
+            $gte: new Date(new Date().getFullYear(), 0, 1),
+          },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            month: { $month: "$createdAt" },
+            related_type: "$related_type",
+          },
+          totalAmount: { $sum: "$amount" },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const monthlyEarnings = {
+      boost: Array(12).fill(0),
+      banner: Array(12).fill(0),
+      subscription: Array(12).fill(0),
+    };
+    const monthlyPurchases = {
+      boost: Array(12).fill(0),
+      banner: Array(12).fill(0),
+      subscription: Array(12).fill(0),
+    };
+
+    monthlyPayments.forEach((item) => {
+      const monthIndex = item._id.month - 1;
+      const type = item._id.related_type;
+      if (type && monthIndex >= 0 && monthIndex < 12) {
+        monthlyEarnings[type][monthIndex] = item.totalAmount;
+        monthlyPurchases[type][monthIndex] = item.count;
+      }
+    });
+
+    /** ------- Yearly Payments ------- **/
+    const yearlyPayments = await PaymentHistory.aggregate([
+      {
+        $match: { status: "succeeded" },
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            related_type: "$related_type",
+          },
+          totalAmount: { $sum: "$amount" },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const yearlyEarnings = {
+      boost: Array(years.length).fill(0),
+      banner: Array(years.length).fill(0),
+      subscription: Array(years.length).fill(0),
+    };
+    const yearlyPurchases = {
+      boost: Array(years.length).fill(0),
+      banner: Array(years.length).fill(0),
+      subscription: Array(years.length).fill(0),
+    };
+
+    yearlyPayments.forEach((item) => {
+      const yearIndex = years.indexOf(item._id.year);
+      const type = item._id.related_type;
+      if (type && yearIndex !== -1) {
+        yearlyEarnings[type][yearIndex] = item.totalAmount;
+        yearlyPurchases[type][yearIndex] = item.count;
+      }
+    });
+
+    /** ------- Custom Payments ------- **/
+    const startDate = startCustom ? new Date(startCustom) : new Date();
+    const endDate = endCustom ? new Date(endCustom) : new Date();
+
+    // Generate all dates between startDate and endDate
+    const generateDateRange = (start, end) => {
+      const dates = [];
+      const current = new Date(start);
+      while (current <= end) {
+        dates.push(current.toISOString().split("T")[0]);
+        current.setDate(current.getDate() + 1);
+      }
+      return dates;
+    };
+
+    const customLabels = generateDateRange(startDate, endDate);
+
+    const customPayments = await PaymentHistory.aggregate([
+      {
+        $match: {
+          status: "succeeded",
+          createdAt: {
+            $gte: startDate,
+            $lte: endDate,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            date: {
+              $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
+            },
+            related_type: "$related_type",
+          },
+          totalAmount: { $sum: "$amount" },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const customEarnings = {
+      boost: Array(customLabels.length).fill(0),
+      banner: Array(customLabels.length).fill(0),
+      subscription: Array(customLabels.length).fill(0),
+    };
+    const customPurchases = {
+      boost: Array(customLabels.length).fill(0),
+      banner: Array(customLabels.length).fill(0),
+      subscription: Array(customLabels.length).fill(0),
+    };
+
+    customPayments.forEach((item) => {
+      const index = customLabels.indexOf(item._id.date);
+      const type = item._id.related_type;
+      if (type && index !== -1) {
+        customEarnings[type][index] = item.totalAmount;
+        customPurchases[type][index] = item.count;
+      }
+    });
+
+    /** ------- Final Earnings & Purchases ------- **/
+    const earningsData = {
+      monthly: {
+        labels: months,
+        boost: filterBySelectedMonths(monthlyEarnings.boost, months),
+        banner: filterBySelectedMonths(monthlyEarnings.banner, months),
+        subscription: filterBySelectedMonths(
+          monthlyEarnings.subscription,
+          months
+        ),
+      },
+      yearly: {
+        labels: years.map(String),
+        boost: yearlyEarnings.boost,
+        banner: yearlyEarnings.banner,
+        subscription: yearlyEarnings.subscription,
+      },
+      custom: {
+        labels: customLabels,
+        boost: customEarnings.boost,
+        banner: customEarnings.banner,
+        subscription: customEarnings.subscription,
+      },
+    };
+
+    const planPurchaseData = {
+      monthly: {
+        labels: months,
+        boost: filterBySelectedMonths(monthlyPurchases.boost, months),
+        banner: filterBySelectedMonths(monthlyPurchases.banner, months),
+        subscription: filterBySelectedMonths(
+          monthlyPurchases.subscription,
+          months
+        ),
+      },
+      yearly: {
+        labels: years.map(String),
+        boost: yearlyPurchases.boost,
+        banner: yearlyPurchases.banner,
+        subscription: yearlyPurchases.subscription,
+      },
+      custom: {
+        labels: customLabels,
+        boost: customPurchases.boost,
+        banner: customPurchases.banner,
+        subscription: customPurchases.subscription,
+      },
+    };
+
     res.status(200).json({
       success: true,
       message: "Get analytic data successful",
@@ -1855,6 +2069,8 @@ const analyticDashboard = async (req, res) => {
       totalExpenses,
       totalSocialSource: socialSourceCount,
       monthlyData,
+      earningsData,
+      planPurchaseData,
     });
   } catch (error) {
     console.error(error);

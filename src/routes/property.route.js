@@ -87,7 +87,7 @@ router.delete(
   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.deleteAppointment
 );
-router.get(
+router.post(
   "/analyticDashboard",
   auth(["isAdmin"]),
   propertyController.analyticDashboard
