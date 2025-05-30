@@ -172,14 +172,11 @@ const stripeWebhook = async (req, res) => {
     }
   }
 
-  if (event.type === "invoice.paid") {
+  // ✅ Best event to handle auto-renewal subscription payments
+  if (event.type === "invoice.payment_succeeded") {
     const invoice = event.data.object;
     const subscriptionId = invoice.subscription;
     const customerId = invoice.customer;
-
-    console.log(
-      `🔁 Recurring payment successful for subscription: ${subscriptionId}`
-    );
 
     const user = await User.findOne({
       stripeCustomerId: customerId,
@@ -187,117 +184,86 @@ const stripeWebhook = async (req, res) => {
     });
 
     if (!user) {
-      console.error(
-        `No user found for customerId=${customerId} and subscriptionId=${subscriptionId}`
-      );
+      console.error(`No user found for customerId=${customerId} and subscriptionId=${subscriptionId}`);
       return res.status(200).send({ received: true });
     }
 
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     const priceId = subscription.items.data[0]?.price?.id;
-
-    if (!priceId) {
-      console.error(`No price ID found for subscription ${subscriptionId}`);
-      return res.status(200).send({ received: true });
-    }
-
-    const plan = await SubscriptionPlan.findOne({ priceId: priceId });
+    const plan = await SubscriptionPlan.findOne({ priceId });
 
     if (!plan) {
-      console.error(`No plan found with priceId: ${priceId}`);
+      console.error(`No plan found for priceId=${priceId}`);
       return res.status(200).send({ received: true });
     }
 
     await SubscriptionService.manageSubscription(user, plan, subscriptionId);
     await SubscriptionService.activateDraftProperties(user);
+
+    user.subscriptionStartDate = new Date(subscription.current_period_start * 1000);
+    user.subscriptionEndDate = new Date(subscription.current_period_end * 1000);
     await user.save();
 
-    console.log(`✅ Subscription successfully extended for user ${user._id}`);
+    console.log(`✅ Auto-renewal applied for user ${user._id}`);
   }
 
+  // ✅ Handle plan changes or upgrade/downgrade (not for payment confirmation)
   if (event.type === "customer.subscription.updated") {
     const subscription = event.data.object;
     const subscriptionId = subscription.id;
     const customerId = subscription.customer;
 
-    console.log(`📝 Subscription updated for subscription: ${subscriptionId}`);
-
     const user = await User.findOne({
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscriptionId,
     });
 
     if (!user) {
-      console.error(
-        `No user found for customerId=${customerId} and subscriptionId=${subscriptionId}`
-      );
+      console.error(`No user found for customerId=${customerId} and subscriptionId=${subscriptionId}`);
       return res.status(200).send({ received: true });
     }
 
+    // Optional: handle plan change logic (only if you care about upgrades/downgrades separately)
     if (subscription.status === "active") {
       const priceId = subscription.items.data[0]?.price?.id;
+      const plan = await SubscriptionPlan.findOne({ priceId });
 
-      if (!priceId) {
-        console.error(`No price ID found for subscription ${subscriptionId}`);
-        return res.status(200).send({ received: true });
+      if (plan) {
+        await SubscriptionService.manageSubscription(user, plan, subscriptionId);
+        await SubscriptionService.activateDraftProperties(user);
+        user.subscriptionStartDate = new Date(subscription.current_period_start * 1000);
+        user.subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+        await user.save();
+        console.log(`📘 Subscription updated for user ${user._id}`);
       }
-
-      const plan = await SubscriptionPlan.findOne({ priceId: priceId });
-
-      if (!plan) {
-        console.error(`No plan found with priceId: ${priceId}`);
-        return res.status(200).send({ received: true });
-      }
-
-      await SubscriptionService.manageSubscription(user, plan, subscriptionId);
-      await SubscriptionService.activateDraftProperties(user);
-
-      user.subscriptionEndDate = new Date(
-        subscription.current_period_end * 1000
-      );
-      user.subscriptionStartDate = new Date(
-        subscription.current_period_start * 1000
-      );
-
-      await user.save();
-
-      console.log(`✅ Subscription period updated for user ${user._id}`);
-      console.log(
-        `New period: ${user.subscriptionStartDate} to ${user.subscriptionEndDate}`
-      );
     }
   }
 
+  // ❌ Handle cancellation
   if (event.type === "customer.subscription.deleted") {
     const subscription = event.data.object;
     const subscriptionId = subscription.id;
     const customerId = subscription.customer;
 
-    console.log(
-      `❌ Subscription cancelled for subscription: ${subscriptionId}`
-    );
-
     const user = await User.findOne({
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscriptionId,
     });
 
     if (!user) {
-      console.error(
-        `No user found for customerId=${customerId} and subscriptionId=${subscriptionId}`
-      );
+      console.error(`No user found for customerId=${customerId} and subscriptionId=${subscriptionId}`);
       return res.status(200).send({ received: true });
     }
 
     user.subscriptionStatus = "cancelled";
     user.subscriptionEndDate = new Date();
-
     await user.save();
 
-    console.log(`✅ Subscription cancelled for user ${user._id}`);
+    console.log(`❌ Subscription cancelled for user ${user._id}`);
   }
 
   res.status(200).send({ received: true });
 };
+
 
 module.exports = stripeWebhook;

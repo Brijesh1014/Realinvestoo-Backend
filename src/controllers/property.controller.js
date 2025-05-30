@@ -1687,22 +1687,20 @@ const analyticDashboard = async (req, res) => {
     const recentProperties = await Property.find(baseQuery)
       .sort({ createdAt: -1 })
       .limit(5)
-      .populate("propertyType")
-      .populate("listingType")
-      .populate("agent")
-      .populate("createdBy")
-      .populate("amenities");
+      .populate("propertyType listingType agent createdBy amenities");
 
     const totalProperties = await Property.countDocuments(baseQuery);
-
-    const totalSold = await Property.countDocuments({
-      ...baseQuery,
-      isSold: true,
-    });
+    const totalSold = await Property.countDocuments({ ...baseQuery, isSold: true });
 
     const totalCustomers = await User.countDocuments({
       $or: [{ isSeller: true }, { isAgent: true }, { isBuyer: true }],
     });
+
+    const totalUsers = await User.countDocuments();
+    const totalBuyers = await User.countDocuments({ isBuyer: true });
+    const totalSellers = await User.countDocuments({ isSeller: true });
+    const totalAgents = await User.countDocuments({ isAgent: true });
+    const activeUsers = await User.countDocuments({ status: "Approved" });
 
     const totalSaleQuery = await Property.aggregate([
       { $match: baseQuery },
@@ -1714,7 +1712,7 @@ const analyticDashboard = async (req, res) => {
           as: "listingTypeDetails",
         },
       },
-      { $unwind: "$listingTypeDetails" },
+    { $unwind: "$listingTypeDetails" },
       { $match: { "listingTypeDetails.name": "Sale" } },
       { $count: "count" },
     ]);
@@ -1755,21 +1753,7 @@ const analyticDashboard = async (req, res) => {
       },
       { $count: "count" },
     ]);
-    const totalVacant =
-      totalVacantQuery.length > 0 ? totalVacantQuery[0].count : 0;
-
-    const totalRevenue = saleProperties.reduce(
-      (total, property) => total + property.totalRevenue,
-      0
-    );
-    const totalIncome = saleProperties.reduce(
-      (total, property) => total + property.totalIncome,
-      0
-    );
-    const totalExpenses = saleProperties.reduce(
-      (total, property) => total + property.totalExpenses,
-      0
-    );
+    const totalVacant = totalVacantQuery[0]?.count || 0;
 
     const totalSocialSource = await Property.aggregate([
       { $match: baseQuery },
@@ -1780,9 +1764,7 @@ const analyticDashboard = async (req, res) => {
         },
       },
     ]);
-    const socialSourceCount = totalSocialSource[0]
-      ? totalSocialSource[0].totalSocialSource
-      : 0;
+    const socialSourceCount = totalSocialSource[0]?.totalSocialSource || 0;
 
     const monthlyAnalytics = await Property.aggregate([
       { $match: baseQuery },
@@ -1819,23 +1801,9 @@ const analyticDashboard = async (req, res) => {
       },
     ]);
 
-    const monthlyData = Array.from({ length: 12 }, (_, i) => {
-      const month = i + 1;
-      const monthData = monthlyAnalytics.find(
-        (data) => data.month === month
-      ) || {
-        month,
-        totalSalePrice: 0,
-        totalExpenses: 0,
-        totalRevenue: 0,
-        totalIncome: 0,
-      };
-      return monthData;
-    });
-
 
     const {
-      months = [], 
+      months = [],
       years = [],
       startCustom,
       endCustom,
@@ -1863,7 +1831,6 @@ const analyticDashboard = async (req, res) => {
         return index !== undefined ? dataArray[index] : 0;
       });
 
-    /** ------- Monthly Payments ------- **/
     const monthlyPayments = await PaymentHistory.aggregate([
       {
         $match: {
@@ -1905,7 +1872,6 @@ const analyticDashboard = async (req, res) => {
       }
     });
 
-    /** ------- Yearly Payments ------- **/
     const yearlyPayments = await PaymentHistory.aggregate([
       {
         $match: { status: "succeeded" },
@@ -1942,11 +1908,9 @@ const analyticDashboard = async (req, res) => {
       }
     });
 
-    /** ------- Custom Payments ------- **/
     const startDate = startCustom ? new Date(startCustom) : new Date();
     const endDate = endCustom ? new Date(endCustom) : new Date();
 
-    // Generate all dates between startDate and endDate
     const generateDateRange = (start, end) => {
       const dates = [];
       const current = new Date(start);
@@ -2003,16 +1967,12 @@ const analyticDashboard = async (req, res) => {
       }
     });
 
-    /** ------- Final Earnings & Purchases ------- **/
     const earningsData = {
       monthly: {
         labels: months,
         boost: filterBySelectedMonths(monthlyEarnings.boost, months),
         banner: filterBySelectedMonths(monthlyEarnings.banner, months),
-        subscription: filterBySelectedMonths(
-          monthlyEarnings.subscription,
-          months
-        ),
+        subscription: filterBySelectedMonths(monthlyEarnings.subscription, months),
       },
       yearly: {
         labels: years.map(String),
@@ -2033,10 +1993,7 @@ const analyticDashboard = async (req, res) => {
         labels: months,
         boost: filterBySelectedMonths(monthlyPurchases.boost, months),
         banner: filterBySelectedMonths(monthlyPurchases.banner, months),
-        subscription: filterBySelectedMonths(
-          monthlyPurchases.subscription,
-          months
-        ),
+        subscription: filterBySelectedMonths(monthlyPurchases.subscription, months),
       },
       yearly: {
         labels: years.map(String),
@@ -2052,9 +2009,23 @@ const analyticDashboard = async (req, res) => {
       },
     };
 
+    // ✅ New totalRevenue from PaymentHistory (status: succeeded)
+    const totalRevenueResult = await PaymentHistory.aggregate([
+      {
+        $match: { status: "succeeded" },
+      },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: "$amount" },
+        },
+      },
+    ]);
+    const totalRevenue = totalRevenueResult[0]?.totalRevenue || 0;
+
     res.status(200).json({
       success: true,
-      message: "Get analytic data successful",
+      message: "Get analytic data successfully",
       saleProperties,
       topLikeProperties,
       recentProperties,
@@ -2064,19 +2035,26 @@ const analyticDashboard = async (req, res) => {
       totalRent,
       totalVacant,
       totalSold,
-      totalRevenue,
-      totalIncome,
-      totalExpenses,
+      totalRevenue, // <-- From PaymentHistory
+      totalIncome: 0,
+      totalExpenses: 0,
       totalSocialSource: socialSourceCount,
-      monthlyData,
       earningsData,
       planPurchaseData,
+      totalUsers,
+      totalBuyers,
+      totalSellers,
+      totalAgents,
+      activeUsers,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to fetch analytics data" });
   }
 };
+
+module.exports = analyticDashboard;
+
 
 const getPropertyByAgentId = async (req, res) => {
   try {
