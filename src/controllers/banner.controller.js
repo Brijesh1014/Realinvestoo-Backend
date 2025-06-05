@@ -33,25 +33,6 @@ const createBanner = async (req, res) => {
       });
     }
 
-    const existingBannerCount = await Banner.countDocuments({ createdBy: userId });
-
-    if (existingBannerCount === 0) {
-      const banner = await Banner.create({
-        title,
-        description,
-        link,
-        image,
-        createdBy: userId,
-        isPaid: true,
-      });
-
-      return res.status(201).json({
-        success: true,
-        message: "First banner created for free.",
-        data: { banner },
-      });
-    }
-
     if (!planId) {
       return res.status(400).json({ success: false, message: "Plan ID is required for paid banners." });
     }

@@ -169,7 +169,10 @@ router.delete(
   auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),
   propertyController.deletePropertyType
 );
-router.post("/boostProperty",  auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]),propertyController.boostProperty)
+router.post("/boostProperty", auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]), propertyController.boostProperty)
+
+router.patch("/activate/:id", auth(["isSeller", "isAdmin", "isBuyer", "isAgent"]), propertyController.activateDraftToActive);
+
 
 
 module.exports = router;

@@ -159,8 +159,8 @@ const stripeWebhook = async (req, res) => {
 
         await user.save();
 
-        const activatedCount =
-          await SubscriptionService.activateDraftProperties(user);
+        // const activatedCount =
+        //   await SubscriptionService.activateDraftProperties(user);
 
         // Save the user again after activating properties
         await user.save();
@@ -198,7 +198,7 @@ const stripeWebhook = async (req, res) => {
     }
 
     await SubscriptionService.manageSubscription(user, plan, subscriptionId);
-    await SubscriptionService.activateDraftProperties(user);
+    // await SubscriptionService.activateDraftProperties(user);
 
     user.subscriptionStartDate = new Date(subscription.current_period_start * 1000);
     user.subscriptionEndDate = new Date(subscription.current_period_end * 1000);
@@ -230,7 +230,7 @@ const stripeWebhook = async (req, res) => {
 
       if (plan) {
         await SubscriptionService.manageSubscription(user, plan, subscriptionId);
-        await SubscriptionService.activateDraftProperties(user);
+        // await SubscriptionService.activateDraftProperties(user);
         user.subscriptionStartDate = new Date(subscription.current_period_start * 1000);
         user.subscriptionEndDate = new Date(subscription.current_period_end * 1000);
         await user.save();
