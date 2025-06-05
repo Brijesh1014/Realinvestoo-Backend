@@ -107,7 +107,7 @@ const createProperty = async (req, res) => {
     }
 
     // Determine property status
-    let propertyStatus = status || "Active";
+    let propertyStatus = status || "Completed";
 
     if (propertyStatus !== "Draft" && user.propertyLimit === 0) {
       propertyStatus = "Draft";
@@ -240,7 +240,7 @@ const activateDraftToActive = async (req, res) => {
       });
     }
 
-    property.status = "Active";
+    property.status = "Completed";
     await property.save();
 
     user.propertyLimit -= 1;
@@ -270,7 +270,7 @@ const createPropertyForAdmin = async (user, req, res) => {
   try {
     const propertyDetails = new Property({
       createdBy: req.userId,
-      status: "Active",
+      status: "Completed",
       ...req.body,
     });
 
@@ -1195,7 +1195,7 @@ const deleteProperty = async (req, res) => {
 
     // If this is an active property, increment the user's property limit
     // We only increment if the property is active, as draft properties don't count against the limit
-    if (property.status === "Active") {
+    if (property.status === "Completed") {
       // Calculate the max limit based on role and subscription
       const baseLimit = user.isAgent ? 5 : user.isSeller ? 3 : 1;
       const maxLimit = user.subscriptionPlanIsActive
