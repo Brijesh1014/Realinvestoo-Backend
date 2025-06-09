@@ -531,12 +531,19 @@ const getAllProperties = async (req, res) => {
 const getTopRatedProperties = async (req, res) => {
   try {
     const now = new Date();
+    const { propertyName } = req.query;
 
-    const boostedProps = await Property.find({
+    const query = {
       isBoost: true,
       "boostPlan.expiryDate": { $gte: now },
       status: { $ne: "Draft" },
-    })
+    };
+
+    if (propertyName) {
+      query.propertyName = { $regex: propertyName, $options: "i" };
+    }
+
+    const boostedProps = await Property.find(query)
       .populate("propertyType listingType amenities ownerId boostPlan.plan")
       .lean();
 
