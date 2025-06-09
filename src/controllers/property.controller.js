@@ -33,6 +33,7 @@ const createProperty = async (req, res) => {
       zipcode,
       amenities,
       propertiesFacing,
+      status
     } = req.body;
 
     const missingFields = [];
@@ -105,9 +106,10 @@ const createProperty = async (req, res) => {
       });
     }
 
-    let propertyStatus = "Active";
+    // Determine property status
+    let propertyStatus = status || "Completed";
 
-    if (user.propertyLimit === 0) {
+    if (propertyStatus !== "Draft" && user.propertyLimit === 0) {
       propertyStatus = "Draft";
     }
 
@@ -144,7 +146,7 @@ const createProperty = async (req, res) => {
     const totalPropertiesCount = user.createdPropertiesCount || 0;
     user.createdPropertiesCount = totalPropertiesCount + 1;
 
-    if (user.propertyLimit > 0) {
+    if (user.propertyLimit > 0 && propertyStatus !== "Draft") {
       user.propertyLimit -= 1;
     }
 
@@ -158,7 +160,10 @@ const createProperty = async (req, res) => {
       responseMessage =
         "Property created successfully but set to Draft status.";
       additionalInfo = {
-        reason: "Property limit reached",
+        reason:
+          status === "Draft"
+            ? "Requested as Draft"
+            : "Property limit reached",
         currentLimit: user.propertyLimit,
         subscriptionActive: user.subscriptionPlanIsActive || false,
         upgradeTip:
@@ -182,12 +187,90 @@ const createProperty = async (req, res) => {
     });
   }
 };
+const activateDraftToActive = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { id } = req.params;
+
+    const property = await Property.findById(id);
+    if (!property) {
+      return res.status(404).json({
+        success: false,
+        message: "Property not found",
+      });
+    }
+    if (!req.isAdmin) {
+
+      if (property.createdBy.toString() !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: "You are not authorized to modify this property.",
+        });
+      }
+    }
+
+    if (property.status !== "Draft") {
+      return res.status(400).json({
+        success: false,
+        message: "Only draft properties can be activated.",
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    if (!user.subscriptionPlanIsActive) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "You do not have an active subscription. Please purchase a plan to activate this property.",
+      });
+    }
+
+    if (user.propertyLimit <= 0) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Your property limit has been reached. Upgrade your subscription to activate more properties.",
+      });
+    }
+
+    property.status = "Completed";
+    await property.save();
+
+    user.propertyLimit -= 1;
+    user.createdPropertiesCount = (user.createdPropertiesCount || 0) + 1;
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Property activated successfully.",
+      data: property,
+      remainingPropertyLimit: user.propertyLimit,
+    });
+  } catch (error) {
+    console.error("Error activating draft property:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to activate property",
+      error: error.message,
+    });
+  }
+};
+
+
 
 const createPropertyForAdmin = async (user, req, res) => {
   try {
     const propertyDetails = new Property({
       createdBy: req.userId,
-      status: "Active",
+      status: "Completed",
       ...req.body,
     });
 
@@ -1119,7 +1202,7 @@ const deleteProperty = async (req, res) => {
 
     // If this is an active property, increment the user's property limit
     // We only increment if the property is active, as draft properties don't count against the limit
-    if (property.status === "Active") {
+    if (property.status === "Completed") {
       // Calculate the max limit based on role and subscription
       const baseLimit = user.isAgent ? 5 : user.isSeller ? 3 : 1;
       const maxLimit = user.subscriptionPlanIsActive
@@ -1319,15 +1402,13 @@ const createAppointment = async (req, res) => {
 
     const propertyDetails = await Property.findById(property).lean();
     const notificationTitle = "New Appointment Scheduled";
-    const notificationMessage = `An appointment with ${
-      req.userId === user
+    const notificationMessage = `An appointment with ${req.userId === user
         ? `Agent ${agentIsExits.name}`
         : req.userId === agent
-        ? `User ${userIsExits.name}`
-        : "the respective person"
-    } has been scheduled for the property at ${
-      propertyDetails.address
-    } on ${date} at ${time}.`;
+          ? `User ${userIsExits.name}`
+          : "the respective person"
+      } has been scheduled for the property at ${propertyDetails.address
+      } on ${date} at ${time}.`;
 
     if (req.userId !== user && userIsExits.fcmToken) {
       await FCMService.sendNotificationToUser(
@@ -1540,14 +1621,12 @@ const updateAppointment = async (req, res) => {
     }
 
     const notificationTitle = "Appointment Updated";
-    let notificationMessage = `The appointment for the property at ${
-      updatedAppointment.property?.address || "unknown address"
-    } has been updated.`;
+    let notificationMessage = `The appointment for the property at ${updatedAppointment.property?.address || "unknown address"
+      } has been updated.`;
 
     if (updatedFields.date || updatedFields.time) {
-      notificationMessage += ` The new schedule is on ${
-        updatedFields.date || updatedAppointment.date
-      } at ${updatedFields.time || updatedAppointment.time}.`;
+      notificationMessage += ` The new schedule is on ${updatedFields.date || updatedAppointment.date
+        } at ${updatedFields.time || updatedAppointment.time}.`;
     }
 
     if (updatedFields.status) {
@@ -1719,7 +1798,7 @@ const analyticDashboard = async (req, res) => {
           as: "listingTypeDetails",
         },
       },
-    { $unwind: "$listingTypeDetails" },
+      { $unwind: "$listingTypeDetails" },
       { $match: { "listingTypeDetails.name": "Sale" } },
       { $count: "count" },
     ]);
@@ -2540,4 +2619,5 @@ module.exports = {
   getAllOwnProperties,
   boostProperty,
   getTopRatedProperties,
+  activateDraftToActive
 };

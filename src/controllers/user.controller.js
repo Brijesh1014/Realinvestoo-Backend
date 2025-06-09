@@ -248,7 +248,7 @@ const getUserById = async (req, res) => {
     const subscriptionUsage = {
       propertyLimit: user.propertyLimit || 0,
       totalProperties: user.properties?.length || 0,
-      activeProperties: user.properties?.filter(p => p.status === 'Active').length || 0,
+      activeProperties: user.properties?.filter(p => p.status === 'Completed').length || 0,
       draftProperties: user.properties?.filter(p => p.status === 'Draft').length || 0
     };
 

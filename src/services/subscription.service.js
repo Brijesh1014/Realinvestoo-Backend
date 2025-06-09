@@ -82,7 +82,7 @@ const activateDraftProperties = async (user) => {
   try {
     const activePropertiesCount = await Property.countDocuments({
       createdBy: user._id,
-      status: "Active",
+      status: "Completed",
     });
 
     const totalPropertiesCount = await Property.countDocuments({
@@ -123,7 +123,7 @@ const activateDraftProperties = async (user) => {
 
     await Property.updateMany(
       { _id: { $in: propertyIdsToActivate } },
-      { $set: { status: "Active" } }
+      { $set: { status: "Completed" } }
     );
 
     const previousLimit = user.propertyLimit;
