@@ -33,7 +33,7 @@ const createProperty = async (req, res) => {
       zipcode,
       amenities,
       propertiesFacing,
-      status
+      status,
     } = req.body;
 
     const missingFields = [];
@@ -80,7 +80,6 @@ const createProperty = async (req, res) => {
       });
     }
 
-    // Validate property details
     const existingPropertyType = await PropertyType.findById(propertyType);
     if (!existingPropertyType) {
       return res
@@ -106,8 +105,11 @@ const createProperty = async (req, res) => {
       });
     }
 
-    // Determine property status
-    let propertyStatus = status || "Completed";
+    let propertyStatus = status;
+
+    if (!propertyStatus) {
+      propertyStatus = user.subscriptionPlanIsActive ? "Completed" : "Draft";
+    }
 
     if (propertyStatus !== "Draft" && user.propertyLimit === 0) {
       propertyStatus = "Draft";
@@ -125,14 +127,12 @@ const createProperty = async (req, res) => {
       }
     }
 
-    // Create property with appropriate status
     const propertyDetails = new Property({
       createdBy: req.userId,
       status: propertyStatus,
       ...req.body,
     });
 
-    // Send notification to admin
     const senderId = req.userId;
     const message = `Check out the latest property: ${propertyDetails.propertyName}`;
     await FCMService.sendNotificationToAdmin(
@@ -149,10 +149,8 @@ const createProperty = async (req, res) => {
     if (user.propertyLimit > 0 && propertyStatus !== "Draft") {
       user.propertyLimit -= 1;
     }
-
     await user.save();
 
-    // Prepare response message
     let responseMessage = "Property created successfully.";
     let additionalInfo = null;
 
@@ -161,9 +159,7 @@ const createProperty = async (req, res) => {
         "Property created successfully but set to Draft status.";
       additionalInfo = {
         reason:
-          status === "Draft"
-            ? "Requested as Draft"
-            : "Property limit reached",
+          status === "Draft" ? "Requested as Draft" : "Property limit reached",
         currentLimit: user.propertyLimit,
         subscriptionActive: user.subscriptionPlanIsActive || false,
         upgradeTip:
@@ -200,7 +196,6 @@ const activateDraftToActive = async (req, res) => {
       });
     }
     if (!req.isAdmin) {
-
       if (property.createdBy.toString() !== userId) {
         return res.status(403).json({
           success: false,
@@ -263,8 +258,6 @@ const activateDraftToActive = async (req, res) => {
     });
   }
 };
-
-
 
 const createPropertyForAdmin = async (user, req, res) => {
   try {
@@ -1402,13 +1395,15 @@ const createAppointment = async (req, res) => {
 
     const propertyDetails = await Property.findById(property).lean();
     const notificationTitle = "New Appointment Scheduled";
-    const notificationMessage = `An appointment with ${req.userId === user
+    const notificationMessage = `An appointment with ${
+      req.userId === user
         ? `Agent ${agentIsExits.name}`
         : req.userId === agent
-          ? `User ${userIsExits.name}`
-          : "the respective person"
-      } has been scheduled for the property at ${propertyDetails.address
-      } on ${date} at ${time}.`;
+        ? `User ${userIsExits.name}`
+        : "the respective person"
+    } has been scheduled for the property at ${
+      propertyDetails.address
+    } on ${date} at ${time}.`;
 
     if (req.userId !== user && userIsExits.fcmToken) {
       await FCMService.sendNotificationToUser(
@@ -1621,12 +1616,14 @@ const updateAppointment = async (req, res) => {
     }
 
     const notificationTitle = "Appointment Updated";
-    let notificationMessage = `The appointment for the property at ${updatedAppointment.property?.address || "unknown address"
-      } has been updated.`;
+    let notificationMessage = `The appointment for the property at ${
+      updatedAppointment.property?.address || "unknown address"
+    } has been updated.`;
 
     if (updatedFields.date || updatedFields.time) {
-      notificationMessage += ` The new schedule is on ${updatedFields.date || updatedAppointment.date
-        } at ${updatedFields.time || updatedAppointment.time}.`;
+      notificationMessage += ` The new schedule is on ${
+        updatedFields.date || updatedAppointment.date
+      } at ${updatedFields.time || updatedAppointment.time}.`;
     }
 
     if (updatedFields.status) {
@@ -1776,7 +1773,10 @@ const analyticDashboard = async (req, res) => {
       .populate("propertyType listingType agent createdBy amenities");
 
     const totalProperties = await Property.countDocuments(baseQuery);
-    const totalSold = await Property.countDocuments({ ...baseQuery, isSold: true });
+    const totalSold = await Property.countDocuments({
+      ...baseQuery,
+      isSold: true,
+    });
 
     const totalCustomers = await User.countDocuments({
       $or: [{ isSeller: true }, { isAgent: true }, { isBuyer: true }],
@@ -1887,13 +1887,7 @@ const analyticDashboard = async (req, res) => {
       },
     ]);
 
-
-    const {
-      months = [],
-      years = [],
-      startCustom,
-      endCustom,
-    } = req.body;
+    const { months = [], years = [], startCustom, endCustom } = req.body;
 
     const monthMap = {
       Jan: 0,
@@ -2058,7 +2052,10 @@ const analyticDashboard = async (req, res) => {
         labels: months,
         boost: filterBySelectedMonths(monthlyEarnings.boost, months),
         banner: filterBySelectedMonths(monthlyEarnings.banner, months),
-        subscription: filterBySelectedMonths(monthlyEarnings.subscription, months),
+        subscription: filterBySelectedMonths(
+          monthlyEarnings.subscription,
+          months
+        ),
       },
       yearly: {
         labels: years.map(String),
@@ -2079,7 +2076,10 @@ const analyticDashboard = async (req, res) => {
         labels: months,
         boost: filterBySelectedMonths(monthlyPurchases.boost, months),
         banner: filterBySelectedMonths(monthlyPurchases.banner, months),
-        subscription: filterBySelectedMonths(monthlyPurchases.subscription, months),
+        subscription: filterBySelectedMonths(
+          monthlyPurchases.subscription,
+          months
+        ),
       },
       yearly: {
         labels: years.map(String),
@@ -2140,7 +2140,6 @@ const analyticDashboard = async (req, res) => {
 };
 
 module.exports = analyticDashboard;
-
 
 const getPropertyByAgentId = async (req, res) => {
   try {
@@ -2619,5 +2618,5 @@ module.exports = {
   getAllOwnProperties,
   boostProperty,
   getTopRatedProperties,
-  activateDraftToActive
+  activateDraftToActive,
 };
