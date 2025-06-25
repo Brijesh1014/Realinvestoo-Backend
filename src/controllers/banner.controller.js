@@ -1,9 +1,8 @@
-
 const Banner = require("../models/banner.model");
 const BannerPlan = require("../models/bannerPlan.model");
 const PaymentHistory = require("../models/paymentHistory.model");
 const createPaymentIntent = require("../utils/createPaymentIntent");
-const User = require("../models/user.model")
+const User = require("../models/user.model");
 
 const createBanner = async (req, res) => {
   try {
@@ -13,7 +12,9 @@ const createBanner = async (req, res) => {
     const user = await User.findById(userId);
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     if (user.isAdmin) {
@@ -34,12 +35,19 @@ const createBanner = async (req, res) => {
     }
 
     if (!planId) {
-      return res.status(400).json({ success: false, message: "Plan ID is required for paid banners." });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Plan ID is required for paid banners.",
+        });
     }
 
     const bannerPlan = await BannerPlan.findById(planId);
     if (!bannerPlan) {
-      return res.status(400).json({ success: false, message: "Banner plan not found" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Banner plan not found" });
     }
 
     const banner = await Banner.create({
@@ -53,15 +61,16 @@ const createBanner = async (req, res) => {
 
     const price = bannerPlan.offerPrice;
 
-    const { clientSecret, stripeCustomerId, stripePaymentIntentId } = await createPaymentIntent({
-      userId,
-      amount: price,
-      relatedType: "banner",
-      metadata: {
-        bannerId: banner._id.toString(),
-        planId: planId.toString(),
-      },
-    });
+    const { clientSecret, stripeCustomerId, stripePaymentIntentId } =
+      await createPaymentIntent({
+        userId,
+        amount: price,
+        relatedType: "banner",
+        metadata: {
+          bannerId: banner._id.toString(),
+          planId: planId.toString(),
+        },
+      });
 
     await PaymentHistory.create({
       userId: userId,
@@ -71,6 +80,7 @@ const createBanner = async (req, res) => {
       stripe_customer_id: stripeCustomerId,
       stripe_payment_intent_id: stripePaymentIntentId,
       status: "pending",
+      currency: "inr",
     });
 
     res.status(201).json({
@@ -86,9 +96,6 @@ const createBanner = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
-
-
 
 const getAllBanners = async (req, res) => {
   try {
