@@ -29,7 +29,7 @@ const register = async (req, res) => {
       lastName,
       dob,
       document,
-      countryCode
+      countryCode,
     } = req.body;
 
     const existingUser = await User_Model.findOne({ email });
@@ -49,22 +49,31 @@ const register = async (req, res) => {
     if (document) {
       const senderId = req.userId;
       const notificationMessage = `Approve or Decline the  ${name}`;
-    
-      await FCMService.sendNotificationToAdmin(senderId, name, notificationMessage);
+      const title = "Review User Document";
+
+      await FCMService.sendNotificationToAdmin(
+        senderId,
+        name,
+        notificationMessage,
+        title
+      );
     }
-    const name = firstName || lastName ? `${firstName || ""} ${lastName || ""}`.trim() : "";
+    const name =
+      firstName || lastName
+        ? `${firstName || ""} ${lastName || ""}`.trim()
+        : "";
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    let propertyLimit
-    
+    let propertyLimit;
+
     if (isAgent) {
-      propertyLimit = 5; 
+      propertyLimit = 5;
     } else if (isSeller) {
-      propertyLimit = 3; 
+      propertyLimit = 3;
     }
-    
+
     const newUser = new User_Model({
       name,
       email,
@@ -85,23 +94,19 @@ const register = async (req, res) => {
       lastName,
       document,
       countryCode,
-      propertyLimit 
+      propertyLimit,
     });
 
     await newUser.save();
 
-    const {
-      accessToken,
-      refreshToken,
-      accessTokenExpiry,
-      refreshTokenExpiry,
-    } = await generateTokens(
-      email,
-      newUser._id,
-      newUser.isAdmin,
-      newUser.isAgent,
-      newUser.isEmp
-    );
+    const { accessToken, refreshToken, accessTokenExpiry, refreshTokenExpiry } =
+      await generateTokens(
+        email,
+        newUser._id,
+        newUser.isAdmin,
+        newUser.isAgent,
+        newUser.isEmp
+      );
 
     res.status(201).json({
       success: true,

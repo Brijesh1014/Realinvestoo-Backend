@@ -135,10 +135,12 @@ const createProperty = async (req, res) => {
 
     const senderId = req.userId;
     const message = `Check out the latest property: ${propertyDetails.propertyName}`;
+    const title = "Property Created";
     await FCMService.sendNotificationToAdmin(
       senderId,
       propertyDetails.propertyName,
-      message
+      message,
+      title
     );
 
     const propertyData = await propertyDetails.save();
@@ -269,10 +271,12 @@ const createPropertyForAdmin = async (user, req, res) => {
 
     const senderId = req.userId;
     const message = `Check out the latest property: ${propertyDetails.propertyName}`;
+    const title = "Property created for admin";
     await FCMService.sendNotificationToAdmin(
       senderId,
       propertyDetails.propertyName,
-      message
+      message,
+      title
     );
 
     const propertyData = await propertyDetails.save();
@@ -1727,6 +1731,86 @@ const analyticDashboard = async (req, res) => {
       },
     ]);
 
+    const firstProperty = await Property.findOne(baseQuery)
+      .sort({ createdAt: 1 })
+      .select("createdAt");
+    let initialPropertiesCount = 0;
+    if (firstProperty) {
+      initialPropertiesCount = await Property.countDocuments({
+        ...baseQuery,
+        createdAt: { $lte: firstProperty.createdAt },
+      });
+    }
+
+  
+    const firstPayment = await PaymentHistory.findOne({ status: "succeeded" })
+      .sort({ createdAt: 1 })
+      .select("createdAt");
+    let initialRevenue = 0;
+    if (firstPayment) {
+      const initRevAgg = await PaymentHistory.aggregate([
+        {
+          $match: {
+            status: "succeeded",
+            createdAt: { $lte: firstPayment.createdAt },
+          },
+        },
+        {
+          $group: { _id: null, total: { $sum: "$amount" } },
+        },
+      ]);
+      initialRevenue = initRevAgg[0]?.total || 0;
+    }
+
+    const firstUser = await User.findOne()
+      .sort({ createdAt: 1 })
+      .select("createdAt");
+    let initialUsersCount = 0;
+    if (firstUser) {
+      initialUsersCount = await User.countDocuments({
+        createdAt: { $lte: firstUser.createdAt },
+      });
+    }
+
+    const firstBuyer = await User.findOne({ isBuyer: true })
+      .sort({ createdAt: 1 })
+      .select("createdAt");
+    let initialBuyersCount = 0;
+    if (firstBuyer) {
+      initialBuyersCount = await User.countDocuments({
+        isBuyer: true,
+        createdAt: { $lte: firstBuyer.createdAt },
+      });
+    }
+
+    const firstSeller = await User.findOne({ isSeller: true })
+      .sort({ createdAt: 1 })
+      .select("createdAt");
+    let initialSellersCount = 0;
+    if (firstSeller) {
+      initialSellersCount = await User.countDocuments({
+        isSeller: true,
+        createdAt: { $lte: firstSeller.createdAt },
+      });
+    }
+
+    const firstAgent = await User.findOne({ isAgent: true })
+      .sort({ createdAt: 1 })
+      .select("createdAt");
+    let initialAgentsCount = 0;
+    if (firstAgent) {
+      initialAgentsCount = await User.countDocuments({
+        isAgent: true,
+        createdAt: { $lte: firstAgent.createdAt },
+      });
+    }
+
+    const calcGrowth = (current, initial) => {
+      if (!initial || initial === 0) return 0;
+      const growth = ((current - initial) / initial) * 100;
+      return Math.min(growth, 100); 
+    };
+
     const saleProperties = await Property.aggregate([
       { $match: baseQuery },
       {
@@ -2115,31 +2199,47 @@ const analyticDashboard = async (req, res) => {
       saleProperties,
       topLikeProperties,
       recentProperties,
-      totalProperties,
       totalCustomers,
       totalSale,
       totalRent,
       totalVacant,
-      totalSold,
-      totalRevenue, // <-- From PaymentHistory
+      totalSold, // <-- From PaymentHistory
       totalIncome: 0,
       totalExpenses: 0,
       totalSocialSource: socialSourceCount,
       earningsData,
       planPurchaseData,
-      totalUsers,
-      totalBuyers,
-      totalSellers,
-      totalAgents,
       activeUsers,
+      totalProperties: {
+        value: totalProperties,
+        growthRate: calcGrowth(totalProperties, initialPropertiesCount),
+      },
+      totalRevenue: {
+        value: totalRevenue,
+        growthRate: calcGrowth(totalRevenue, initialRevenue),
+      },
+      totalUsers: {
+        value: totalUsers,
+        growthRate: calcGrowth(totalUsers, initialUsersCount),
+      },
+      totalBuyers: {
+        value: totalBuyers,
+        growthRate: calcGrowth(totalBuyers, initialBuyersCount),
+      },
+      totalSellers: {
+        value: totalSellers,
+        growthRate: calcGrowth(totalSellers, initialSellersCount),
+      },
+      totalAgents: {
+        value: totalAgents,
+        growthRate: calcGrowth(totalAgents, initialAgentsCount),
+      },
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to fetch analytics data" });
   }
 };
-
-module.exports = analyticDashboard;
 
 const getPropertyByAgentId = async (req, res) => {
   try {

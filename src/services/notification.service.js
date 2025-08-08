@@ -88,22 +88,22 @@ const FCMService = {
       );
     }
   },
-  sendNotificationToAdmin: async (senderId, name, message) => {
+  sendNotificationToAdmin: async (senderId, name, message, title = "") => {
     try {
       const admins = await User.find({
         isAdmin: true,
         fcmToken: { $exists: true, $ne: null },
       });
-  
+
       if (admins.length === 0) {
-        console.log('No admin users with FCM tokens found.');
+        console.log("No admin users with FCM tokens found.");
         return;
       }
-  
-      const tokens = admins.map(admin => admin.fcmToken);
-  
-      const recipientIds = admins.map(admin => admin._id);
-  
+
+      const tokens = admins.map((admin) => admin.fcmToken);
+
+      const recipientIds = admins.map((admin) => admin._id);
+
       if (!tokens || tokens.length === 0) {
         console.log(`No FCM token found for user ${recipientIds}`);
         return;
@@ -118,29 +118,29 @@ const FCMService = {
           },
           webpush: {
             headers: {
-              Urgency: 'high',
+              Urgency: "high",
             },
             notification: {
-              icon: '/favicon.ico',
-              click_action: 'https://real-investoo-admin.vercel.app/dashboard', 
+              icon: "/favicon.ico",
+              click_action: "https://real-investoo-admin.vercel.app/dashboard",
             },
           },
         };
-  
+
         try {
           const response = await admin.messaging().send(notificationMessage);
         } catch (error) {
-          console.error('Error sending notification:', error);
+          console.error("Error sending notification:", error);
         }
       }
-  
+
       const response = {
         successCount: tokens.length,
-        failureCount: 0,  
+        failureCount: 0,
       };
-  
+
       await Notification.create({
-        name,
+        title,
         message,
         senderId,
         recipients: recipientIds,
@@ -148,16 +148,12 @@ const FCMService = {
         successCount: response.successCount,
         failureCount: response.failureCount,
       });
-  
+
       console.log(`Notification sent to ${response.successCount} admin(s)`);
-  
     } catch (error) {
-      console.error('Error sending notification to admins:', error);
+      console.error("Error sending notification to admins:", error);
     }
-  }
-  
-   
-  
+  },
 };
 
 async function getAllUserTokens() {

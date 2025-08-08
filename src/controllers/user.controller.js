@@ -87,7 +87,7 @@ const editProfile = async (req, res) => {
       dob,
       firstName,
       lastName,
-      countryCode
+      countryCode,
     };
 
     let profileImageUrl;
@@ -207,39 +207,44 @@ const getUserById = async (req, res) => {
       baseQuery.$or = [
         { isSeller: true },
         { isBuyer: true },
-        { isAgent: true }
+        { isAgent: true },
       ];
     }
 
-    let user = await User_Model.findOne(baseQuery)
-      .populate({ path: 'subscription.plan', model: 'SubscriptionPlan' });
+    let user = await User_Model.findOne(baseQuery).populate({
+      path: "subscription.plan",
+      model: "SubscriptionPlan",
+    });
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found" + (!isAdmin ? " or not in allowed roles" : ""),
+        message:
+          "User not found" + (!isAdmin ? " or not in allowed roles" : ""),
       });
     }
 
     if (user.properties?.length > 0) {
-      await user.populate('properties');
+      await user.populate("properties");
     }
 
     const paymentHistory = await PaymentHistory.find({
       userId: id,
-      status: 'succeeded'
+      status: "succeeded",
     })
-      .populate('banner')
-      .populate('boostPlanId')
-      .populate('subscriptionProperty')
+      .populate("banner")
+      .populate("boostPlanId")
+      .populate("subscriptionProperty")
       .sort({ createdAt: -1 });
 
-    const groupPlans = (type) => paymentHistory.filter(plan => plan.related_type === type);
-    const isActive = (item) => item.end_date && new Date(item.end_date) > new Date();
+    const groupPlans = (type) =>
+      paymentHistory.filter((plan) => plan.related_type === type);
+    const isActive = (item) =>
+      item.end_date && new Date(item.end_date) > new Date();
 
-    const banners = groupPlans('banner');
-    const boosts = groupPlans('boost');
-    const subscriptions = groupPlans('subscription');
+    const banners = groupPlans("banner");
+    const boosts = groupPlans("boost");
+    const subscriptions = groupPlans("subscription");
 
     const activeBanners = banners.filter(isActive);
     const activeBoosts = boosts.filter(isActive);
@@ -248,8 +253,10 @@ const getUserById = async (req, res) => {
     const subscriptionUsage = {
       propertyLimit: user.propertyLimit || 0,
       totalProperties: user.properties?.length || 0,
-      activeProperties: user.properties?.filter(p => p.status === 'Completed').length || 0,
-      draftProperties: user.properties?.filter(p => p.status === 'Draft').length || 0
+      activeProperties:
+        user.properties?.filter((p) => p.status === "Completed").length || 0,
+      draftProperties:
+        user.properties?.filter((p) => p.status === "Draft").length || 0,
     };
 
     return res.status(200).json({
@@ -265,11 +272,10 @@ const getUserById = async (req, res) => {
           subscriptions,
           activeSubscriptions,
           subscriptionUsage,
-          allPlans: paymentHistory
-        }
-      }
+          allPlans: paymentHistory,
+        },
+      },
     });
-
   } catch (error) {
     console.error("Error fetching user by ID:", error);
     return res.status(500).json({
@@ -286,7 +292,9 @@ const uploadDocument = async (req, res) => {
 
     const user = await User_Model.findById(id);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     if (user.document) {
@@ -310,11 +318,13 @@ const uploadDocument = async (req, res) => {
 
     const senderId = req.userId;
     const notificationMessage = `Please review and approve or decline the request for ${user.name}.`;
+    const title = "Review User Document";
 
     await FCMService.sendNotificationToAdmin(
       senderId,
       user.name,
-      notificationMessage
+      notificationMessage,
+      title
     );
 
     user.document = documentUrl;
@@ -340,11 +350,9 @@ const uploadDocument = async (req, res) => {
   }
 };
 
-
-
 const getPaymentHistory = async (req, res) => {
   try {
-    const userId = req.userId; 
+    const userId = req.userId;
 
     const { related_type, status } = req.query;
 
@@ -354,9 +362,9 @@ const getPaymentHistory = async (req, res) => {
     if (status) filter.status = status;
 
     const history = await PaymentHistory.find(filter)
-      .populate("banner", "title image") 
+      .populate("banner", "title image")
       .populate("boostProperty", "propertyName mainPhoto")
-      .populate("subscriptionProperty", "name") 
+      .populate("subscriptionProperty", "name")
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -373,17 +381,15 @@ const getPaymentHistory = async (req, res) => {
   }
 };
 
-
 const getUserBoostedProperties = async (req, res) => {
   try {
-    const userId  = req.userId;
+    const userId = req.userId;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
 
-
     const filter = {
       isBoost: true,
-        ...(userId && { createdBy: userId }),
+      ...(userId && { createdBy: userId }),
     };
 
     const skip = (page - 1) * limit;
@@ -401,12 +407,12 @@ const getUserBoostedProperties = async (req, res) => {
     ]);
 
     const totalPages = Math.ceil(total / limit);
-      if (!boostedProperties.length) {
-    return res.status(404).json({
-      success: false,
-      message: "No boosted properties found for the given criteria.",
-    });
-  }
+    if (!boostedProperties.length) {
+      return res.status(404).json({
+        success: false,
+        message: "No boosted properties found for the given criteria.",
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -428,14 +434,11 @@ const getUserBoostedProperties = async (req, res) => {
   }
 };
 
-
-
-
 module.exports = {
   getAllAgents,
   editProfile,
   getUserById,
   uploadDocument,
   getPaymentHistory,
-  getUserBoostedProperties
+  getUserBoostedProperties,
 };
