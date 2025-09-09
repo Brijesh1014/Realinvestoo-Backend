@@ -1697,8 +1697,21 @@ const deleteAppointment = async (req, res) => {
     });
   }
 };
+let cachedAnalytics = null;
+let lastCacheTime = null;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 const analyticDashboard = async (req, res) => {
   try {
+    // Return cached data if available and not expired
+    if (
+      cachedAnalytics &&
+      lastCacheTime &&
+      Date.now() - lastCacheTime < CACHE_DURATION
+    ) {
+      return res.status(200).json(cachedAnalytics);
+    }
+
     const baseQuery = { status: { $ne: "Draft" } };
 
     const approvedUsers = await User.find({
@@ -1742,7 +1755,6 @@ const analyticDashboard = async (req, res) => {
       });
     }
 
-  
     const firstPayment = await PaymentHistory.findOne({ status: "succeeded" })
       .sort({ createdAt: 1 })
       .select("createdAt");
@@ -1808,7 +1820,7 @@ const analyticDashboard = async (req, res) => {
     const calcGrowth = (current, initial) => {
       if (!initial || initial === 0) return 0;
       const growth = ((current - initial) / initial) * 100;
-      return Math.min(growth, 100); 
+      return Math.min(growth, 100);
     };
 
     const saleProperties = await Property.aggregate([
@@ -2193,7 +2205,8 @@ const analyticDashboard = async (req, res) => {
     ]);
     const totalRevenue = totalRevenueResult[0]?.totalRevenue || 0;
 
-    res.status(200).json({
+    // Prepare response data
+    const responseData = {
       success: true,
       message: "Get analytic data successfully",
       saleProperties,
@@ -2203,7 +2216,7 @@ const analyticDashboard = async (req, res) => {
       totalSale,
       totalRent,
       totalVacant,
-      totalSold, // <-- From PaymentHistory
+      totalSold,
       totalIncome: 0,
       totalExpenses: 0,
       totalSocialSource: socialSourceCount,
@@ -2234,7 +2247,14 @@ const analyticDashboard = async (req, res) => {
         value: totalAgents,
         growthRate: calcGrowth(totalAgents, initialAgentsCount),
       },
-    });
+    };
+
+    // Cache the response
+    cachedAnalytics = responseData;
+    lastCacheTime = Date.now();
+
+    // Send the response
+    res.status(200).json(responseData);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to fetch analytics data" });
