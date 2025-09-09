@@ -20,7 +20,9 @@
   ],
   "functions": {
     "index.js": {
-      "maxDuration": 60
+      "runtime": "nodejs20.x",
+      "maxDuration": 60,
+      "regions": ["bom1"]
     }
   }
 }
